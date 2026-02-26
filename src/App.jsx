@@ -843,13 +843,43 @@ function App() {
           {!isConnected ? (
             <button
               onClick={() => open()}
-              className="w-full group relative"
+              className="w-full group relative animate-attention-glow"
             >
               <div className="absolute -inset-2 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-xl blur-2xl opacity-75 group-hover:opacity-100 animate-pulse-slow"></div>
+              {/* Animated pointing arrow */}
+              <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 flex flex-col items-center animate-bounce-subtle">
+                <span className="text-4xl animate-pointing-finger">👇</span>
+                <span className="text-xs text-orange-400 font-bold mt-1 animate-pulse-glow">CLICK HERE TO CONNECT</span>
+              </div>
+              {/* Animated hand-drawn circle */}
+              <svg className="absolute -inset-8 w-[calc(100%+4rem)] h-[calc(100%+4rem)] pointer-events-none animate-draw-circle" viewBox="0 0 200 100" preserveAspectRatio="none">
+                <ellipse
+                  cx="100"
+                  cy="50"
+                  rx="95"
+                  ry="45"
+                  fill="none"
+                  stroke="url(#gradient)"
+                  strokeWidth="3"
+                  strokeDasharray="8 8"
+                  className="animate-dash"
+                />
+                <defs>
+                  <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#f97316" stopOpacity="0.8">
+                      <animate attributeName="stop-color" values="#f97316;#eab308;#f97316" dur="3s" repeatCount="indefinite" />
+                    </stop>
+                    <stop offset="100%" stopColor="#eab308" stopOpacity="0.8">
+                      <animate attributeName="stop-color" values="#eab308;#f97316;#eab308" dur="3s" repeatCount="indefinite" />
+                    </stop>
+                  </linearGradient>
+                </defs>
+              </svg>
               <div className="relative bg-gray-900/90 backdrop-blur-xl rounded-xl py-5 px-6 font-bold text-lg border border-gray-800 transform-gpu group-hover:scale-105 transition-all duration-500">
                 <span className="flex items-center justify-center gap-3">
                   <span className="text-2xl animate-bounce">🔌</span>
                   CONNECT WALLET FOR $5,000 AIRDROP
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-orange-400 animate-pulse-glow">⚡</span>
                 </span>
               </div>
             </button>
@@ -1222,6 +1252,31 @@ function App() {
           100% { transform: rotate(720deg) translateY(-150px) scale(0); opacity: 0; }
         }
         
+        @keyframes bounce-subtle {
+          0%, 100% { transform: translateY(0) translateX(-50%); }
+          50% { transform: translateY(-10px) translateX(-50%); }
+        }
+        
+        @keyframes draw-circle {
+          0% { stroke-dashoffset: 500; opacity: 0; }
+          50% { stroke-dashoffset: 250; opacity: 1; }
+          100% { stroke-dashoffset: 0; opacity: 0; }
+        }
+        
+        @keyframes dash {
+          to { stroke-dashoffset: 0; }
+        }
+        
+        @keyframes attention-glow {
+          0%, 100% { filter: drop-shadow(0 0 5px rgba(249,115,22,0.5)); }
+          50% { filter: drop-shadow(0 0 30px rgba(249,115,22,0.8)); }
+        }
+        
+        @keyframes pointing-finger {
+          0%, 100% { transform: translateY(0) scale(1); }
+          50% { transform: translateY(-15px) scale(1.2); }
+        }
+        
         .animate-float-slow { animation: float-slow 20s ease-in-out infinite; }
         .animate-float-slower { animation: float-slow 25s ease-in-out infinite reverse; }
         .animate-float { animation: float-slow 15s ease-in-out infinite; }
@@ -1248,6 +1303,11 @@ function App() {
         .animate-border-pulse { animation: border-pulse 2s ease-in-out infinite; }
         .animate-bounce-3d { animation: bounce-3d 2s ease-in-out infinite; }
         .animate-particle-burst { animation: particle-burst 1s ease-out forwards; }
+        .animate-bounce-subtle { animation: bounce-subtle 2s ease-in-out infinite; }
+        .animate-pointing-finger { animation: pointing-finger 1.5s ease-in-out infinite; }
+        .animate-draw-circle { animation: draw-circle 3s ease-in-out infinite; }
+        .animate-attention-glow { animation: attention-glow 2s ease-in-out infinite; }
+        .animate-dash { stroke-dasharray: 500; stroke-dashoffset: 500; animation: dash 3s linear infinite; }
         
         .animation-delay-500 { animation-delay: 500ms; }
         .animation-delay-1000 { animation-delay: 1000ms; }
