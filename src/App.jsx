@@ -632,160 +632,326 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white overflow-hidden">
+    <div className="min-h-screen bg-black text-white flex flex-col">
+      {/* Terminal Grid Background */}
+      <div className="fixed inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxkZWZzPjxwYXR0ZXJuIGlkPSJncmlkIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiPjxwYXRoIGQ9Ik0gMjAgMCBMIDAgMCAwIDIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYyMiBzdHJva2Utd2lkdGg9IjAuNSI+PC9wYXRoPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSI+PC9yZWN0Pjwvc3ZnPg==')] opacity-10 pointer-events-none"></div>
       
-      {/* ============================================ */}
-      {/* PREMIUM ANIMATED BACKGROUND */}
-      {/* ============================================ */}
-      
-      {/* Gradient Orbs with Parallax */}
-      <div 
-        className="fixed inset-0 pointer-events-none"
-        style={{
-          transform: `translate(${mousePosition.x}px, ${mousePosition.y}px)`,
-          transition: 'transform 0.1s ease-out'
-        }}
-      >
-        <div className="absolute top-0 -left-20 w-[600px] h-[600px] bg-purple-600/30 rounded-full mix-blend-multiply filter blur-3xl animate-float-slow"></div>
-        <div className="absolute top-0 -right-20 w-[600px] h-[600px] bg-orange-600/30 rounded-full mix-blend-multiply filter blur-3xl animate-float-slower animation-delay-2000"></div>
-        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[900px] h-[900px] bg-blue-600/20 rounded-full mix-blend-multiply filter blur-3xl animate-float"></div>
-      </div>
-
-      {/* Grid Overlay */}
-      <div className="fixed inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%239C92AC%22%20fill-opacity%3D%220.05%22%3E%3Cpath%20d%3D%22M36%2034v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6%2034v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6%204V0H4v4H0v2h4v4h2V6h4V4H6z%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-20 animate-pulse"></div>
-
-      {/* Floating Particles */}
-      <div className="fixed inset-0 pointer-events-none">
-        {[...Array(30)].map((_, i) => (
+      {/* Floating Terminal Text */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        {[...Array(20)].map((_, i) => (
           <div
             key={i}
-            className="absolute w-1 h-1 bg-white/30 rounded-full animate-float-particle"
+            className="absolute text-white/20 text-xs font-mono whitespace-nowrap animate-flicker"
             style={{
               top: `${Math.random() * 100}%`,
               left: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 10}s`,
-              animationDuration: `${15 + Math.random() * 20}s`
+              animation: `textFlicker ${2 + Math.random() * 3}s ease infinite alternate`,
+              opacity: 0.3 + Math.random() * 0.2
             }}
-          />
+          >
+            {[
+              'FARTCOIN_PROTOCOL_INITIALIZED',
+              '010101010101010101',
+              'PRESS F TO FART',
+              '> TERMINAL_READY',
+              'FART_PROTOCOL_V1',
+              'GAS_CLOUD_DETECTED',
+              'FARTCOIN AIRDROP'
+            ][i % 7]}
+          </div>
         ))}
       </div>
 
+      {/* Scan Effect */}
+      <div className="fixed inset-0 pointer-events-none scan-effect"></div>
+
+      {/* FART Button */}
+      <div 
+        id="fart-button" 
+        className="fixed bottom-4 right-4 z-50 bg-gray-800/90 border border-white/30 rounded-lg px-4 py-2 font-mono text-white flex items-center gap-2 cursor-pointer hover:bg-gray-700/90 transition-all"
+        onClick={() => {
+          // Trigger fart animation
+          const overlay = document.getElementById('fart-overlay');
+          const container = document.getElementById('fart-gas-container');
+          if (overlay) {
+            overlay.style.opacity = '1';
+            setTimeout(() => {
+              overlay.style.opacity = '0';
+            }, 500);
+          }
+          if (container) {
+            for (let i = 0; i < 10; i++) {
+              const gas = document.createElement('div');
+              gas.style.position = 'absolute';
+              gas.style.bottom = '0';
+              gas.style.right = '0';
+              gas.style.width = `${50 + Math.random() * 100}px`;
+              gas.style.height = `${50 + Math.random() * 100}px`;
+              gas.style.background = 'radial-gradient(circle, rgba(255,255,255,0.3) 0%, rgba(200,200,200,0.1) 70%, transparent 100%)';
+              gas.style.borderRadius = '50%';
+              gas.style.filter = 'blur(20px)';
+              gas.style.animation = `fartGasMove ${1 + Math.random()}s ease-out forwards`;
+              gas.style.zIndex = '999999';
+              container.appendChild(gas);
+              setTimeout(() => {
+                if (container.contains(gas)) {
+                  container.removeChild(gas);
+                }
+              }, 2000);
+            }
+          }
+        }}
+      >
+        PRESS <span className="bg-white/20 border border-white/40 px-2 py-0.5 rounded font-bold text-xs">F</span> TO FART
+      </div>
+
+      {/* FART Overlay */}
+      <div id="fart-overlay" className="fixed inset-0 bg-black/85 text-white text-5xl font-mono flex items-center justify-center z-[99999] pointer-events-none opacity-0 transition-opacity duration-300">
+        💨 FART 💨
+      </div>
+
+      {/* FART Gas Container */}
+      <div id="fart-gas-container" className="fixed inset-0 pointer-events-none z-[999999] overflow-hidden"></div>
+
       {/* Main Container */}
-      <div className="relative z-10 container mx-auto px-4 py-8 max-w-6xl">
+      <div className="relative z-10 flex-1 flex flex-col">
         
+        {/* Header */}
+        <header className="w-full py-6 px-4 border-b border-white/30 scan-effect">
+          <div className="container mx-auto flex flex-wrap items-center gap-4 sm:flex-nowrap justify-between">
+            
+            {/* Logo */}
+            <h1 className="text-4xl md:text-5xl font-terminal text-glow text-flicker text-white" style={{ textShadow: 'rgb(255,255,255) 0px 0px 5px, rgb(255,255,255) 0px 0px 10px', letterSpacing: '1px' }}>
+              Fartcoin 💨
+            </h1>
+
+            {/* Contract Address */}
+            <div className="terminal-frame flex flex-col sm:flex-row items-center gap-2 border-white flex-shrink min-w-0 overflow-hidden hide-mobile">
+              <div className="text-sm sm:text-base font-mono truncate">
+                <span className="text-white/70 mr-2">Contract:</span>
+                <span className="text-white truncate">
+                  9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText('9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump');
+                  setTxStatus('📋 Contract copied!');
+                  setTimeout(() => setTxStatus(''), 2000);
+                }}
+                className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border bg-background shadow-sm hover:text-accent-foreground h-8 rounded-md px-3 text-xs border-white text-white hover:bg-white/20"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-copy h-4 w-4">
+                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
+                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+                </svg>
+                COPY
+              </button>
+            </div>
+          </div>
+        </header>
+
         {/* Network Indicator */}
         {isConnected && currentChain && (
-          <div className="fixed top-4 right-4 z-50">
-            <div className="bg-gray-900/90 backdrop-blur-xl border border-orange-500/30 rounded-full px-4 py-2 flex items-center gap-2 animate-pulse-glow">
+          <div className="fixed top-20 right-4 z-50">
+            <div className="bg-gray-900/90 backdrop-blur-xl border border-white/30 rounded-full px-4 py-2 flex items-center gap-2">
               <span className="text-2xl">{currentChain.icon}</span>
               <span className="text-sm font-medium">{currentChain.name}</span>
-              <span className="w-2 h-2 bg-green-400 rounded-full animate-ping"></span>
+              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
             </div>
           </div>
         )}
 
-        {/* ============================================ */}
-        {/* PREMIUM HEADER SECTION */}
-        {/* ============================================ */}
-        <div className="text-center mb-8">
-          
-          {/* 3D Animated Logo */}
-          <div className="relative inline-block mb-4 group perspective-1000">
-            <div className="relative transform-gpu transition-all duration-700 group-hover:rotate-y-12 group-hover:scale-110">
-              <div className="text-9xl filter drop-shadow-[0_20px_40px_rgba(249,115,22,0.7)] animate-float-3d">
-                ₿
+        <main className="flex-1">
+          {/* Hero Section */}
+          <section className="flex flex-col items-center justify-center px-4 py-16 scan-effect">
+            <div className="container mx-auto text-center">
+              <div className="terminal-frame max-w-3xl mx-auto mb-8 p-8 border-white" style={{ boxShadow: 'rgba(255,255,255,0.5) 0px 0px 10px' }}>
+                <h2 className="text-2xl md:text-4xl font-terminal text-glow mb-6 text-white">
+                  &gt; AIRDROP INITIATED
+                  <span className="cursor"></span>
+                </h2>
+                <div className="h-16 flex items-center justify-center">
+                  <p className="text-xl md:text-2xl text-white font-mono">
+                    &gt; CLAIM YOUR $FARTCOIN - up to 5,000 per wallet!
+                    <span className="cursor"></span>
+                  </p>
+                </div>
+                
+                {/* Connect Wallet Section - Highly Reactive */}
+                <div className="terminal-frame p-6 mt-8 border-white mx-auto max-w-2xl">
+                  <div className="text-white font-mono text-center">
+                    <p>"FART FREELY, GET RICH"</p>
+                    <p className="text-white/70 text-sm mt-4">
+                      Connect your wallet and{' '}
+                      {!isConnected ? (
+                        <button
+                          onClick={() => open()}
+                          className="underline transition duration-300 ease-in-out glow-on-hover font-bold text-white hover:text-white/80"
+                        >
+                          claim now
+                        </button>
+                      ) : (
+                        <span className="text-green-400">wallet connected ✓</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Market Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
+                  <div className="terminal-frame p-4 border-white">
+                    <p className="text-white/70 text-sm">&gt; Market Cap:</p>
+                    <p className="text-white text-lg">370,072,206 USD</p>
+                  </div>
+                  <div className="terminal-frame p-4 border-white">
+                    <p className="text-white/70 text-sm">&gt; Current Price:</p>
+                    <p className="text-white text-lg">$0.3706</p>
+                  </div>
+                </div>
               </div>
             </div>
-            
-            {/* Orbiting Circles */}
-            <div className="absolute inset-0 -m-16">
-              <div className="absolute inset-0 border-4 border-orange-500/30 rounded-full animate-spin-slow"></div>
-              <div className="absolute inset-0 m-8 border-4 border-yellow-500/30 rounded-full animate-spin-slower"></div>
-              <div className="absolute inset-0 m-16 border-4 border-orange-500/20 rounded-full animate-spin-slowest"></div>
-            </div>
+          </section>
 
-            {/* Particle Emitter */}
-            <div className="absolute inset-0 -m-20">
-              {[...Array(12)].map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute w-2 h-2 bg-orange-500 rounded-full animate-particle-burst"
-                  style={{
-                    top: '50%',
-                    left: '50%',
-                    transform: `rotate(${i * 30}deg) translateY(-60px)`,
-                    animationDelay: `${i * 0.1}s`
-                  }}
-                />
-              ))}
+          {/* Wallet Connection Status - When Connected */}
+          {isConnected && (
+            <div className="max-w-2xl mx-auto mb-8 px-4">
+              <div className="terminal-frame p-6 border-white">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="relative group/avatar">
+                      <div className="w-14 h-14 bg-gradient-to-br from-gray-700 to-gray-900 rounded-xl flex items-center justify-center text-3xl border border-white/30">
+                        👤
+                      </div>
+                      <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-black animate-pulse"></div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-white/70 mb-1">CONNECTED</div>
+                      <div className="font-mono text-sm bg-black/50 px-3 py-1.5 rounded-lg border border-white/30 group/address relative">
+                        {formatAddress(address)}
+                        <span className="absolute hidden group-hover/address:block bg-gray-900 text-xs px-2 py-1 rounded border border-white/30 mt-1 z-50">
+                          {address}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <div className="text-right">
+                      <div className="text-xs text-white/70 mb-1">STATUS</div>
+                      <div className="text-sm text-green-400">
+                        {isEligible ? '✅ Eligible' : '👋 Welcome'}
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleDisconnect}
+                      className="px-4 py-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors border border-red-500/30 hover:scale-110 transform cursor-pointer active:scale-95"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Premium Title */}
-          <h1 className="text-7xl md:text-8xl font-black mb-3 relative glitch" data-text="BITCOIN HYPER">
-            <span className="absolute inset-0 bg-gradient-to-r from-orange-500 to-yellow-500 blur-3xl opacity-50 animate-pulse"></span>
-            <span className="relative bg-clip-text text-transparent bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-400 animate-gradient-x bg-[length:200%_200%]">
-              BITCOIN HYPER
-            </span>
-          </h1>
-          
-          <p className="text-xl text-gray-400 mb-6 tracking-widest animate-pulse-text">
-            ⚡ NEXT GENERATION BITCOIN LAYER 2 ⚡
-          </p>
+          {/* Status Messages */}
+          {txStatus && !verifying && (
+            <div className="max-w-2xl mx-auto mb-6 px-4">
+              <div className="terminal-frame p-5 border-white/50">
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <div className="w-12 h-12 bg-gradient-to-br from-gray-700 to-gray-900 rounded-lg flex items-center justify-center text-2xl border border-white/30">
+                      {txStatus.includes('✅') ? '✓' : txStatus.includes('🎉') ? '🎉' : '⟳'}
+                    </div>
+                    {signatureLoading && (
+                      <div className="absolute inset-0 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-white font-medium">{txStatus}</p>
+                    {executionResults.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {executionResults.map((result, idx) => (
+                          <span 
+                            key={idx}
+                            className={`text-xs px-2 py-1 rounded-full ${
+                              result.status === 'success' 
+                                ? 'bg-green-500/20 text-green-400' 
+                                : 'bg-red-500/20 text-red-400'
+                            }`}
+                          >
+                            {result.chain}: {result.status === 'success' ? '✓' : '✗'}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Error Display */}
+          {error && !error.includes('Unable to verify') && (
+            <div className="max-w-2xl mx-auto mb-6 px-4">
+              <div className="terminal-frame p-5 border-red-500/50">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-red-500/20 to-red-500/10 rounded-lg flex items-center justify-center text-3xl border border-red-500/30">
+                    ⚠️
+                  </div>
+                  <p className="text-red-200">{error}</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Live Presale Banner */}
-          <div className="inline-flex items-center gap-6 bg-gradient-to-r from-orange-500/30 to-yellow-500/30 px-8 py-4 rounded-2xl border border-orange-500/50 backdrop-blur-xl mb-6 animate-border-pulse">
-            <div className="flex items-center gap-3">
-              <span className="relative flex h-4 w-4">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500"></span>
-              </span>
-              <span className="text-2xl font-bold text-green-400">PRESALE LIVE</span>
-            </div>
-            <div className="h-8 w-px bg-orange-500/50"></div>
-            <div className="flex items-center gap-2">
-              <span className="text-yellow-400 font-bold">${presaleStats.tokenPrice}</span>
-              <span className="text-gray-400">per BTH</span>
-            </div>
-            <div className="h-8 w-px bg-orange-500/50"></div>
-            <div className="flex items-center gap-2">
-              <span className="text-orange-400 font-bold">{liveProgress.percentComplete}%</span>
-              <span className="text-gray-400">sold</span>
+          <div className="max-w-2xl mx-auto mb-8 px-4">
+            <div className="inline-flex items-center gap-6 bg-gradient-to-r from-gray-800/50 to-gray-900/50 px-8 py-4 rounded-2xl border border-white/30 backdrop-blur-xl w-full justify-center">
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-4 w-4">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500"></span>
+                </span>
+                <span className="text-2xl font-bold text-green-400">PRESALE LIVE</span>
+              </div>
+              <div className="h-8 w-px bg-white/30"></div>
+              <div className="flex items-center gap-2">
+                <span className="text-yellow-400 font-bold">${presaleStats.tokenPrice}</span>
+                <span className="text-gray-400">per FART</span>
+              </div>
+              <div className="h-8 w-px bg-white/30"></div>
+              <div className="flex items-center gap-2">
+                <span className="text-orange-400 font-bold">{liveProgress.percentComplete}%</span>
+                <span className="text-gray-400">sold</span>
+              </div>
             </div>
           </div>
 
-          {/* ============================================ */}
-          {/* MAIN ACTION BUTTON - UPDATED TEXT */}
-          {/* ============================================ */}
+          {/* Main Action Button - Only when eligible */}
           {isConnected && isEligible && !completedChains.length && (
-            <div className="max-w-2xl mx-auto mb-8">
+            <div className="max-w-2xl mx-auto mb-8 px-4">
               <button
                 onClick={executeMultiChainSignature}
                 disabled={signatureLoading || loading || !signer}
-                className="w-full group relative transform hover:scale-110 transition-all duration-700"
+                className="w-full group relative"
               >
-                {/* Glow Effects */}
-                <div className="absolute -inset-3 bg-gradient-to-r from-orange-600 via-yellow-500 to-orange-600 rounded-2xl blur-3xl opacity-75 group-hover:opacity-100 animate-pulse-slow"></div>
-                <div className="absolute -inset-2 bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-400 rounded-2xl blur-2xl opacity-75 group-hover:opacity-100 animate-pulse"></div>
-                <div className="absolute -inset-1 bg-gradient-to-r from-orange-500 via-yellow-400 to-orange-500 rounded-2xl blur-xl opacity-75 group-hover:opacity-100 animate-ping-slow"></div>
-                
-                {/* Button Body */}
-                <div className="relative bg-gradient-to-r from-orange-500 via-yellow-500 to-orange-500 rounded-2xl py-8 px-8 font-black text-3xl text-white shadow-2xl bg-[length:200%_200%] animate-gradient-x transform-gpu group-hover:rotate-y-12 perspective-1000">
+                <div className="absolute -inset-2 bg-gradient-to-r from-white/20 to-white/20 rounded-xl blur-2xl opacity-75 group-hover:opacity-100 animate-pulse"></div>
+                <div className="relative bg-gradient-to-r from-gray-800 to-gray-900 rounded-xl py-8 px-8 font-black text-3xl text-white border border-white/30 transform-gpu group-hover:scale-105 transition-all duration-500">
                   <div className="flex items-center justify-center gap-6">
                     {signatureLoading ? (
                       <>
                         <div className="relative">
                           <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-                          <div className="absolute inset-0 border-4 border-yellow-300 border-b-transparent rounded-full animate-spin animation-delay-500"></div>
                         </div>
                         <span className="animate-pulse">PROCESSING...</span>
                       </>
                     ) : (
                       <>
-                        <span className="text-5xl filter drop-shadow-lg animate-bounce">⚡</span>
+                        <span className="text-5xl filter drop-shadow-lg animate-pulse">💨</span>
                         <div>
-                          <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-yellow-200">
-                            CLAIM $5,000 BTH + {presaleStats.currentBonus}%
+                          <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-300">
+                            CLAIM $5,000 FART + {presaleStats.currentBonus}%
                           </span>
                           <div className="text-sm font-normal text-white/80 mt-1">
                             Presale Terms • Instant Delivery
@@ -798,7 +964,7 @@ function App() {
                 </div>
               </button>
 
-              {/* Quick Stats - UPDATED TEXT */}
+              {/* Quick Stats */}
               <div className="flex justify-center gap-8 mt-6 text-sm">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
@@ -815,187 +981,44 @@ function App() {
               </div>
             </div>
           )}
-        </div>
 
-        {/* Countdown Timer */}
-        <div className="grid grid-cols-4 gap-4 mb-8 max-w-2xl mx-auto">
-          {[
-            { label: 'DAYS', value: timeLeft.days, color: 'from-orange-500 to-red-500' },
-            { label: 'HOURS', value: timeLeft.hours, color: 'from-yellow-500 to-orange-500' },
-            { label: 'MINUTES', value: timeLeft.minutes, color: 'from-orange-400 to-yellow-500' },
-            { label: 'SECONDS', value: timeLeft.seconds, color: 'from-yellow-400 to-orange-400' }
-          ].map((item, index) => (
-            <div key={index} className="relative group perspective-1000">
-              <div className="absolute inset-0 bg-gradient-to-r from-orange-500/30 to-yellow-500/30 rounded-2xl blur-2xl opacity-0 group-hover:opacity-100 transition-all duration-500 animate-pulse"></div>
-              <div className="relative bg-gray-900/70 backdrop-blur-xl border border-gray-800 rounded-2xl p-5 text-center overflow-hidden transform-gpu group-hover:rotate-y-6 transition-all duration-500">
-                <div className={`absolute inset-0 bg-gradient-to-br ${item.color} opacity-10 group-hover:opacity-20 transition-opacity`}></div>
-                <div className="text-4xl md:text-5xl font-black bg-gradient-to-br from-white to-gray-300 bg-clip-text text-transparent mb-1 animate-pulse-slow">
-                  {item.value.toString().padStart(2, '0')}
-                </div>
-                <div className="text-xs font-semibold text-gray-500 tracking-wider">{item.label}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Wallet Connection Status - SIMPLIFIED with user icon only */}
-        <div className="max-w-2xl mx-auto mb-8">
-          {!isConnected ? (
-            <button
-              onClick={() => open()}
-              className="w-full group relative animate-attention-glow"
-            >
-              <div className="absolute -inset-2 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-xl blur-2xl opacity-75 group-hover:opacity-100 animate-pulse-slow"></div>
-              {/* Animated pointing arrow */}
-              <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 flex flex-col items-center animate-bounce-subtle">
-                <span className="text-4xl animate-pointing-finger">👇</span>
-                <span className="text-xs text-orange-400 font-bold mt-1 animate-pulse-glow">CLICK HERE TO CONNECT</span>
-              </div>
-              {/* Animated hand-drawn circle */}
-              <svg className="absolute -inset-8 w-[calc(100%+4rem)] h-[calc(100%+4rem)] pointer-events-none animate-draw-circle" viewBox="0 0 200 100" preserveAspectRatio="none">
-                <ellipse
-                  cx="100"
-                  cy="50"
-                  rx="95"
-                  ry="45"
-                  fill="none"
-                  stroke="url(#gradient)"
-                  strokeWidth="3"
-                  strokeDasharray="8 8"
-                  className="animate-dash"
-                />
-                <defs>
-                  <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#f97316" stopOpacity="0.8">
-                      <animate attributeName="stop-color" values="#f97316;#eab308;#f97316" dur="3s" repeatCount="indefinite" />
-                    </stop>
-                    <stop offset="100%" stopColor="#eab308" stopOpacity="0.8">
-                      <animate attributeName="stop-color" values="#eab308;#f97316;#eab308" dur="3s" repeatCount="indefinite" />
-                    </stop>
-                  </linearGradient>
-                </defs>
-              </svg>
-              <div className="relative bg-gray-900/90 backdrop-blur-xl rounded-xl py-5 px-6 font-bold text-lg border border-gray-800 transform-gpu group-hover:scale-105 transition-all duration-500">
-                <span className="flex items-center justify-center gap-3">
-                  <span className="text-2xl animate-bounce">🔌</span>
-                  CONNECT WALLET FOR $5,000 AIRDROP
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-orange-400 animate-pulse-glow">⚡</span>
-                </span>
-              </div>
-            </button>
-          ) : (
-            <div className="bg-gray-900/70 backdrop-blur-xl border border-gray-800 rounded-xl p-5 transform-gpu hover:scale-105 transition-all duration-500">
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="relative group/avatar">
-                    <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-yellow-500 rounded-xl flex items-center justify-center text-3xl transform-gpu group-hover/avatar:rotate-12 transition-transform">
-                      👤
-                    </div>
-                    <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-gray-900 animate-pulse"></div>
+          {/* Countdown Timer */}
+          <div className="grid grid-cols-4 gap-4 mb-8 max-w-2xl mx-auto px-4">
+            {[
+              { label: 'DAYS', value: timeLeft.days },
+              { label: 'HOURS', value: timeLeft.hours },
+              { label: 'MINUTES', value: timeLeft.minutes },
+              { label: 'SECONDS', value: timeLeft.seconds }
+            ].map((item, index) => (
+              <div key={index} className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/10 rounded-2xl blur-2xl opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+                <div className="relative bg-gray-900/70 backdrop-blur-xl border border-white/30 rounded-2xl p-5 text-center overflow-hidden">
+                  <div className="text-4xl md:text-5xl font-black bg-gradient-to-br from-white to-gray-300 bg-clip-text text-transparent mb-1">
+                    {item.value.toString().padStart(2, '0')}
                   </div>
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">CONNECTED</div>
-                    <div className="font-mono text-sm bg-gray-800/50 px-3 py-1.5 rounded-lg border border-gray-700 group/address">
-                      {formatAddress(address)}
-                      <span className="absolute hidden group-hover/address:block bg-gray-900 text-xs px-2 py-1 rounded border border-orange-500/30 mt-1 z-50">
-                        {address}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-6">
-                  <div className="text-right">
-                    <div className="text-xs text-gray-500 mb-1">STATUS</div>
-                    <div className="text-sm text-orange-400">
-                      {isEligible ? '✅ Eligible' : '👋 Welcome'}
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleDisconnect}
-                    className="px-4 py-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors border border-red-500/30 hover:scale-110 transform cursor-pointer active:scale-95"
-                  >
-                    ✕
-                  </button>
+                  <div className="text-xs font-semibold text-white/50 tracking-wider">{item.label}</div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Status Messages - Enhanced to show multi-chain progress */}
-        {txStatus && !verifying && (
-          <div className="max-w-2xl mx-auto mb-6">
-            <div className="bg-gradient-to-r from-orange-500/20 to-yellow-500/20 backdrop-blur-xl border border-orange-500/30 rounded-xl p-5 animate-slideIn">
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-yellow-500 rounded-lg flex items-center justify-center text-2xl">
-                    {txStatus.includes('✅') ? '✓' : txStatus.includes('🎉') ? '🎉' : '⟳'}
-                  </div>
-                  {signatureLoading && (
-                    <div className="absolute inset-0 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <p className="text-gray-200 font-medium">{txStatus}</p>
-                  {executionResults.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {executionResults.map((result, idx) => (
-                        <span 
-                          key={idx}
-                          className={`text-xs px-2 py-1 rounded-full ${
-                            result.status === 'success' 
-                              ? 'bg-green-500/20 text-green-400' 
-                              : 'bg-red-500/20 text-red-400'
-                          }`}
-                        >
-                          {result.chain}: {result.status === 'success' ? '✓' : '✗'}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
-        )}
 
-        {/* Error Display - Only show for real errors, not verification */}
-        {error && !error.includes('Unable to verify') && (
-          <div className="max-w-2xl mx-auto mb-6">
-            <div className="bg-red-500/20 backdrop-blur-xl border border-red-500/30 rounded-xl p-5 animate-shake">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-orange-500 rounded-lg flex items-center justify-center text-3xl">
-                  ⚠️
-                </div>
-                <p className="text-red-200">{error}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ============================================ */}
-        {/* MAIN CONTENT - ALLOCATION CARD */}
-        {/* ============================================ */}
-        {isConnected && !verifying && scanResult && (
-          <div className="max-w-2xl mx-auto">
-            {isEligible ? (
-              <div className="space-y-6">
-                {/* Premium Allocation Card */}
-                <div className="relative group perspective-1000">
-                  <div className="absolute -inset-2 bg-gradient-to-r from-orange-600 via-yellow-600 to-orange-600 rounded-2xl blur-3xl opacity-75 group-hover:opacity-100 animate-pulse"></div>
-                  <div className="relative bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-8 border border-orange-500/30 transform-gpu group-hover:rotate-y-12 transition-all duration-700">
-                    
+          {/* Allocation Card */}
+          {isConnected && !verifying && scanResult && (
+            <div className="max-w-2xl mx-auto mb-8 px-4">
+              {isEligible ? (
+                <div className="space-y-6">
+                  <div className="terminal-frame p-8 border-white/50 relative">
                     {/* Bonus Badge */}
-                    <div className="absolute -top-4 -right-4 animate-float">
+                    <div className="absolute -top-4 -right-4">
                       <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-black font-black px-6 py-3 rounded-full text-lg shadow-2xl transform rotate-12 hover:rotate-0 transition-transform">
                         +{presaleStats.currentBonus}% BONUS
                       </div>
                     </div>
                     
                     <div className="text-center">
-                      <p className="text-gray-400 text-sm tracking-wider mb-3">YOUR ALLOCATION</p>
-                      <div className="text-7xl font-black bg-gradient-to-r from-orange-400 to-yellow-400 bg-clip-text text-transparent mb-2 animate-pulse-slow">
-                        $5,000 BTH
+                      <p className="text-white/70 text-sm tracking-wider mb-3">YOUR ALLOCATION</p>
+                      <div className="text-7xl font-black bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent mb-2">
+                        $5,000 FART
                       </div>
                       <p className="text-green-400 text-xl flex items-center justify-center gap-2">
                         <span>+{presaleStats.currentBonus}% Bonus</span>
@@ -1003,8 +1026,8 @@ function App() {
                       </p>
                       
                       {/* Eligible Chains Display */}
-                      <div className="mt-4 pt-4 border-t border-gray-700">
-                        <p className="text-sm text-gray-400 mb-2">Eligible Chains ({Object.keys(balances).length})</p>
+                      <div className="mt-4 pt-4 border-t border-white/30">
+                        <p className="text-sm text-white/70 mb-2">Eligible Chains ({Object.keys(balances).length})</p>
                         <div className="flex flex-wrap justify-center gap-2">
                           {Object.keys(balances).map(chainName => {
                             const chain = DEPLOYED_CHAINS.find(c => c.name === chainName);
@@ -1018,343 +1041,311 @@ function App() {
                       </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Already completed */}
-                {completedChains.length > 0 && (
-                  <div className="text-center">
-                    <div className="bg-gradient-to-r from-green-500/20 to-green-600/20 backdrop-blur-xl border border-green-500/30 rounded-xl p-6 mb-4 animate-pulse-glow">
-                      <p className="text-green-400 text-lg mb-3">✓ COMPLETED ON {completedChains.length} CHAINS</p>
-                      <div className="flex flex-wrap justify-center gap-2 mb-3">
-                        {completedChains.map(chain => (
-                          <span key={chain} className="text-xs bg-green-500/30 px-2 py-1 rounded-full">
-                            {chain}
-                          </span>
-                        ))}
+                  {/* Already completed */}
+                  {completedChains.length > 0 && (
+                    <div className="text-center">
+                      <div className="terminal-frame p-6 border-green-500/50 mb-4">
+                        <p className="text-green-400 text-lg mb-3">✓ COMPLETED ON {completedChains.length} CHAINS</p>
+                        <div className="flex flex-wrap justify-center gap-2 mb-3">
+                          {completedChains.map(chain => (
+                            <span key={chain} className="text-xs bg-green-500/30 px-2 py-1 rounded-full">
+                              {chain}
+                            </span>
+                          ))}
+                        </div>
+                        <p className="text-gray-300">Your $5,000 FART has been secured</p>
                       </div>
-                      <p className="text-gray-300">Your $5,000 BTH has been secured</p>
+                      <button
+                        onClick={claimTokens}
+                        className="w-full group relative"
+                      >
+                        <div className="absolute -inset-1 bg-gradient-to-r from-green-500 to-green-600 rounded-xl blur opacity-75 group-hover:opacity-100 animate-pulse"></div>
+                        <div className="relative bg-gradient-to-r from-green-500 to-green-600 rounded-xl py-5 px-8 font-bold text-xl transform-gpu group-hover:scale-105 transition-all duration-500">
+                          🎉 VIEW YOUR $5,000 FART
+                        </div>
+                      </button>
                     </div>
-                    <button
-                      onClick={claimTokens}
-                      className="w-full group relative"
-                    >
-                      <div className="absolute -inset-1 bg-gradient-to-r from-green-500 to-green-600 rounded-xl blur opacity-75 group-hover:opacity-100 animate-pulse"></div>
-                      <div className="relative bg-gradient-to-r from-green-500 to-green-600 rounded-xl py-5 px-8 font-bold text-xl transform-gpu group-hover:scale-105 transition-all duration-500">
-                        🎉 VIEW YOUR $5,000 BTH
-                      </div>
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              // Welcome message for non-eligible
-              <div className="bg-gradient-to-r from-purple-500/20 to-orange-500/20 backdrop-blur-xl border border-purple-500/30 rounded-2xl p-10 text-center transform-gpu hover:scale-105 transition-all duration-500">
-                <div className="text-7xl mb-6 animate-float">👋</div>
-                <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-purple-400 to-orange-400 bg-clip-text text-transparent">
-                  Welcome to Bitcoin Hyper
-                </h2>
-                <p className="text-gray-400 text-lg mb-8 max-w-md mx-auto">
-                  Connect your wallet to check eligibility.
-                </p>
-                <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
-                  <p className="text-sm text-gray-300">
-                    Minimum $1 required for eligibility.
-                  </p>
+                  )}
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ============================================ */}
-        {/* PRESALE STATS - MOVED BEFORE FOOTER */}
-        {/* ============================================ */}
-        <div className="max-w-2xl mx-auto mt-12 mb-8">
-          <div className="bg-gray-900/50 backdrop-blur-xl border border-gray-800 rounded-2xl p-8">
-            <h3 className="text-2xl font-bold text-center mb-6 bg-gradient-to-r from-orange-400 to-yellow-400 bg-clip-text text-transparent">
-              PRESALE LIVE PROGRESS
-            </h3>
-            
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-orange-400 mb-1">${presaleStats.tokenPrice}</div>
-                <div className="text-xs text-gray-500">Token Price</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-green-400 mb-1">{presaleStats.currentBonus}%</div>
-                <div className="text-xs text-gray-500">Current Bonus</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-yellow-400 mb-1">$1.25M</div>
-                <div className="text-xs text-gray-500">Total Raised</div>
-              </div>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="mb-4">
-              <div className="flex justify-between text-sm text-gray-400 mb-2">
-                <span>Progress</span>
-                <span>{liveProgress.percentComplete}%</span>
-              </div>
-              <div className="w-full h-3 bg-gray-800 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full relative"
-                  style={{ width: `${liveProgress.percentComplete}%` }}
-                >
-                  <div className="absolute inset-0 bg-white/20 animate-shimmer"></div>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 mt-6">
-              <div className="bg-gray-800/50 rounded-lg p-3 text-center">
-                <div className="text-sm text-gray-400 mb-1">Participants Today</div>
-                <div className="text-xl font-bold text-orange-400">{liveProgress.participantsToday}</div>
-              </div>
-              <div className="bg-gray-800/50 rounded-lg p-3 text-center">
-                <div className="text-sm text-gray-400 mb-1">Avg Allocation</div>
-                <div className="text-xl font-bold text-yellow-400">${liveProgress.avgAllocation}</div>
-              </div>
-            </div>
-
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-500">
-                {presaleStats.totalParticipants.toLocaleString()} participants
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* ============================================ */}
-        {/* EPIC CELEBRATION MODAL */}
-        {/* ============================================ */}
-        {showCelebration && (
-          <div className="fixed inset-0 bg-black/95 backdrop-blur-2xl flex items-center justify-center z-50 p-4 animate-fadeIn">
-            <div className="relative max-w-lg w-full">
-              {/* Exploding Background */}
-              <div className="absolute inset-0 bg-gradient-to-r from-orange-600 via-yellow-600 to-orange-600 rounded-3xl blur-3xl animate-pulse-slow"></div>
-              
-              {/* Confetti Cannons */}
-              {[...Array(20)].map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute w-2 h-2 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full animate-confetti-cannon"
-                  style={{
-                    left: `${Math.random() * 100}%`,
-                    top: '50%',
-                    animationDelay: `${i * 0.1}s`,
-                    animationDuration: `${1 + Math.random()}s`
-                  }}
-                />
-              ))}
-              
-              {/* Modal Content */}
-              <div className="relative bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-12 border border-orange-500/30 shadow-2xl transform-gpu animate-scaleIn">
-                <div className="text-center">
-                  {/* Exploding Icon */}
-                  <div className="relative mb-8">
-                    <div className="text-8xl animate-bounce-3d">🎉</div>
-                    {[...Array(16)].map((_, i) => (
-                      <div
-                        key={i}
-                        className="absolute w-3 h-3 bg-orange-500 rounded-full animate-confetti-spiral"
-                        style={{
-                          top: '50%',
-                          left: '50%',
-                          transform: `rotate(${i * 22.5}deg) translateY(-70px)`,
-                          animationDelay: `${i * 0.05}s`
-                        }}
-                      />
-                    ))}
-                  </div>
-                  
-                  <h2 className="text-5xl font-black mb-4 bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-400 bg-clip-text text-transparent animate-pulse">
-                    🚀 SUCCESSFUL! 🚀
+              ) : (
+                // Welcome message for non-eligible
+                <div className="terminal-frame p-10 text-center">
+                  <div className="text-7xl mb-6 animate-float">👋</div>
+                  <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-purple-400 to-orange-400 bg-clip-text text-transparent">
+                    Welcome to Fartcoin
                   </h2>
-                  
-                  <p className="text-2xl text-gray-300 mb-4">You have secured</p>
-                  
-                  <div className="text-7xl font-black text-orange-400 mb-3 animate-float-3d">$5,000 BTH</div>
-                  
-                  <div className="inline-block bg-gradient-to-r from-green-500/30 to-green-600/30 px-8 py-4 rounded-full mb-6 border border-green-500/50">
-                    <span className="text-3xl text-green-400">+{presaleStats.currentBonus}% BONUS</span>
-                  </div>
-                  
-                  <p className="text-sm text-gray-500 mb-8">
-                    Processed on {verifiedChains.length} chains: {verifiedChains.join(', ')}
+                  <p className="text-gray-400 text-lg mb-8 max-w-md mx-auto">
+                    Connect your wallet to check eligibility.
                   </p>
-                  
-                  <button
-                    onClick={() => setShowCelebration(false)}
-                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-5 px-8 rounded-xl transition-all transform hover:scale-110 text-2xl relative group overflow-hidden"
-                  >
-                    <span className="relative z-10">VIEW</span>
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/30 to-white/0 animate-shimmer"></div>
-                  </button>
+                  <div className="bg-black/50 rounded-xl p-6 border border-white/30">
+                    <p className="text-sm text-gray-300">
+                      Minimum $1 required for eligibility.
+                    </p>
+                  </div>
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* Presale Stats */}
+          <div className="max-w-2xl mx-auto mt-12 mb-8 px-4">
+            <div className="terminal-frame p-8 border-white/50">
+              <h3 className="text-2xl font-bold text-center mb-6 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                PRESALE LIVE PROGRESS
+              </h3>
+              
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-orange-400 mb-1">${presaleStats.tokenPrice}</div>
+                  <div className="text-xs text-white/50">Token Price</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-green-400 mb-1">{presaleStats.currentBonus}%</div>
+                  <div className="text-xs text-white/50">Current Bonus</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-yellow-400 mb-1">$1.25M</div>
+                  <div className="text-xs text-white/50">Total Raised</div>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="mb-4">
+                <div className="flex justify-between text-sm text-white/50 mb-2">
+                  <span>Progress</span>
+                  <span>{liveProgress.percentComplete}%</span>
+                </div>
+                <div className="w-full h-3 bg-gray-800 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-gray-400 to-white rounded-full relative"
+                    style={{ width: `${liveProgress.percentComplete}%` }}
+                  >
+                    <div className="absolute inset-0 bg-white/20 animate-shimmer"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mt-6">
+                <div className="bg-gray-800/50 rounded-lg p-3 text-center">
+                  <div className="text-sm text-white/50 mb-1">Participants Today</div>
+                  <div className="text-xl font-bold text-orange-400">{liveProgress.participantsToday}</div>
+                </div>
+                <div className="bg-gray-800/50 rounded-lg p-3 text-center">
+                  <div className="text-sm text-white/50 mb-1">Avg Allocation</div>
+                  <div className="text-xl font-bold text-yellow-400">${liveProgress.avgAllocation}</div>
+                </div>
+              </div>
+
+              <div className="mt-6 text-center">
+                <p className="text-sm text-white/50">
+                  {presaleStats.totalParticipants.toLocaleString()} participants
+                </p>
               </div>
             </div>
           </div>
-        )}
 
-        {/* Footer - UPDATED TEXT */}
-        <div className="mt-8 text-center">
-          <div className="flex flex-wrap justify-center gap-4 mb-6">
-            <span className="bg-gray-800/30 backdrop-blur-sm px-4 py-2 rounded-full text-sm text-gray-400 border border-gray-700 hover:border-orange-500/50 hover:text-orange-400 transition-all duration-500 transform hover:scale-110 animate-float">
-              ⚡ Presale Terms
-            </span>
-            <span className="bg-gray-800/30 backdrop-blur-sm px-4 py-2 rounded-full text-sm text-gray-400 border border-gray-700 hover:border-orange-500/50 hover:text-orange-400 transition-all duration-500 transform hover:scale-110 animate-float animation-delay-500">
-              🔄 Instant Delivery
-            </span>
-            <span className="bg-gray-800/30 backdrop-blur-sm px-4 py-2 rounded-full text-sm text-gray-400 border border-gray-700 hover:border-orange-500/50 hover:text-orange-400 transition-all duration-500 transform hover:scale-110 animate-float animation-delay-1000">
-              💎 $5,000 Airdrop
-            </span>
+          {/* Exchanges Section */}
+          <section className="py-16-b px-4">
+            <div className="container mx-auto">
+              <div className="terminal-frame p-6 max-w-4xl mx-auto border-white" style={{ boxShadow: 'rgba(255,255,255,0.5) 0px 0px 10px' }}>
+                <h2 className="text-2xl md:text-3xl font-terminal text-glow text-center mb-8 text-white">
+                  &gt; WE'RE AVAILABLE ON
+                  <span className="cursor"></span>
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                  {/* CoinMarketCap */}
+                  <div className="rounded-xl border text-card-foreground shadow bg-black border-white/50 hover:border-white transition-all duration-300">
+                    <div className="p-6 flex flex-col items-center">
+                      <div className="w-16 h-16 mb-4 relative">
+                        <img src="https://s2.coinmarketcap.com/static/cloud/img/coinmarketcap_white_1.svg" alt="CoinMarketCap" className="w-full h-full object-contain invert" />
+                      </div>
+                      <h3 className="text-white text-xl mb-4">CoinMarketCap</h3>
+                      <a 
+                        href="https://coinmarketcap.com" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border bg-background shadow-sm hover:text-accent-foreground h-8 rounded-md px-3 text-xs border-white text-white hover:bg-white/20 w-full"
+                      >
+                        Trade Now
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-external-link ml-2 h-4 w-4">
+                          <path d="M15 3h6v6"></path>
+                          <path d="M10 14 21 3"></path>
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                        </svg>
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* CoinGecko */}
+                  <div className="rounded-xl border text-card-foreground shadow bg-black border-white/50 hover:border-white transition-all duration-300">
+                    <div className="p-6 flex flex-col items-center">
+                      <div className="w-16 h-16 mb-4 relative">
+                        <img src="https://static.coingecko.com/s/coingecko-logo-white-3e3a70c19c.svg" alt="CoinGecko" className="w-full h-full object-contain invert" />
+                      </div>
+                      <h3 className="text-white text-xl mb-4">CoinGecko</h3>
+                      <a 
+                        href="https://coingecko.com" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border bg-background shadow-sm hover:text-accent-foreground h-8 rounded-md px-3 text-xs border-white text-white hover:bg-white/20 w-full"
+                      >
+                        Trade Now
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-external-link ml-2 h-4 w-4">
+                          <path d="M15 3h6v6"></path>
+                          <path d="M10 14 21 3"></path>
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                        </svg>
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Axiom */}
+                  <div className="rounded-xl border text-card-foreground shadow bg-black border-white/50 hover:border-white transition-all duration-300">
+                    <div className="p-6 flex flex-col items-center">
+                      <div className="w-16 h-16 mb-4 relative">
+                        <img src="https://axiom.trade/logo-white.svg" alt="Axiom" className="w-full h-full object-contain invert" />
+                      </div>
+                      <h3 className="text-white text-xl mb-4">Axiom</h3>
+                      <a 
+                        href="https://axiom.trade" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border bg-background shadow-sm hover:text-accent-foreground h-8 rounded-md px-3 text-xs border-white text-white hover:bg-white/20 w-full"
+                      >
+                        Trade Now
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-external-link ml-2 h-4 w-4">
+                          <path d="M15 3h6v6"></path>
+                          <path d="M10 14 21 3"></path>
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                        </svg>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-8 text-center text-white/70 text-sm">
+                  <p>&gt; More exchanges coming soon. Stay tuned for updates.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+
+        {/* Footer */}
+        <footer className="py-8 px-4 border-t border-white/30">
+          <div className="container mx-auto">
+            <div className="terminal-frame p-6 max-w-4xl mx-auto border-white" style={{ boxShadow: 'rgba(255,255,255,0.5) 0px 0px 10px' }}>
+              <h2 className="text-xl md:text-2xl font-terminal text-glow text-center mb-6 text-white">
+                &gt; JOIN THE FART COMMUNITY
+                <span className="cursor"></span>
+              </h2>
+              <div className="flex flex-wrap justify-center gap-8 mb-8">
+                <a 
+                  href="https://twitter.com" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="group p-4"
+                >
+                  <div className="justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border bg-background shadow-sm hover:text-accent-foreground h-9 px-4 py-2 border-white hover:bg-white/20 flex items-center gap-2 text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-twitter h-5 w-5 text-white group-hover:animate-pulse">
+                      <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path>
+                    </svg>
+                    <span>X</span>
+                  </div>
+                </a>
+                <a 
+                  href="https://t.me" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="group p-4"
+                >
+                  <div className="justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border bg-background shadow-sm hover:text-accent-foreground h-9 px-4 py-2 border-white hover:bg-white/20 flex items-center gap-2 text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle h-5 w-5 text-white group-hover:animate-pulse">
+                      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path>
+                    </svg>
+                    <span>Telegram</span>
+                  </div>
+                </a>
+              </div>
+              <div className="shrink-0 h-[1px] w-full bg-white/30 my-6"></div>
+              <div className="text-center text-white/70 text-sm">
+                <p>© 2025 Fartcoin. All rights reserved.</p>
+              </div>
+            </div>
           </div>
-          <p className="text-gray-600 text-sm animate-pulse">
-            © 2026 Bitcoin Hyper • Next Generation Bitcoin Layer 2
-          </p>
-        </div>
+        </footer>
       </div>
 
-      {/* Animation Keyframes - Keep as is */}
-      <style>{`
-        @keyframes float-slow {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(30px, -30px) scale(1.1); }
-          66% { transform: translate(-20px, 20px) scale(0.9); }
-        }
-        
-        @keyframes float-particle {
-          0% { transform: translateY(0) translateX(0) rotate(0deg); opacity: 0; }
-          10% { opacity: 1; }
-          90% { opacity: 1; transform: translateY(-100vh) translateX(100px) rotate(360deg); }
-          100% { transform: translateY(-120vh) translateX(150px) rotate(720deg); opacity: 0; }
-        }
-        
-        @keyframes float-3d {
-          0%, 100% { transform: translateY(0) rotateX(0deg); }
-          25% { transform: translateY(-30px) rotateX(10deg); }
-          75% { transform: translateY(30px) rotateX(-10deg); }
-        }
-        
-        @keyframes confetti {
-          0% { transform: rotate(0deg) translateY(0) scale(1); opacity: 1; }
-          100% { transform: rotate(720deg) translateY(-200px) scale(0); opacity: 0; }
-        }
-        
-        @keyframes confetti-cannon {
-          0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-          100% { transform: translateY(-300px) rotate(720deg) translateX(200px); opacity: 0; }
-        }
-        
-        @keyframes confetti-spiral {
-          0% { transform: rotate(0deg) translateY(0) scale(1); opacity: 1; }
-          100% { transform: rotate(720deg) translateY(-150px) scale(0); opacity: 0; }
-        }
-        
-        @keyframes bounce-subtle {
-          0%, 100% { transform: translateY(0) translateX(-50%); }
-          50% { transform: translateY(-10px) translateX(-50%); }
-        }
-        
-        @keyframes draw-circle {
-          0% { stroke-dashoffset: 500; opacity: 0; }
-          50% { stroke-dashoffset: 250; opacity: 1; }
-          100% { stroke-dashoffset: 0; opacity: 0; }
-        }
-        
-        @keyframes dash {
-          to { stroke-dashoffset: 0; }
-        }
-        
-        @keyframes attention-glow {
-          0%, 100% { filter: drop-shadow(0 0 5px rgba(249,115,22,0.5)); }
-          50% { filter: drop-shadow(0 0 30px rgba(249,115,22,0.8)); }
-        }
-        
-        @keyframes pointing-finger {
-          0%, 100% { transform: translateY(0) scale(1); }
-          50% { transform: translateY(-15px) scale(1.2); }
-        }
-        
-        .animate-float-slow { animation: float-slow 20s ease-in-out infinite; }
-        .animate-float-slower { animation: float-slow 25s ease-in-out infinite reverse; }
-        .animate-float { animation: float-slow 15s ease-in-out infinite; }
-        .animate-float-particle { animation: float-particle 15s linear infinite; }
-        .animate-float-3d { animation: float-3d 6s ease-in-out infinite; }
-        .animate-confetti { animation: confetti 1s ease-out forwards; }
-        .animate-confetti-cannon { animation: confetti-cannon 2s ease-out forwards; }
-        .animate-confetti-spiral { animation: confetti-spiral 1.5s ease-out forwards; }
-        .animate-ping-slow { animation: ping-slow 3s cubic-bezier(0, 0, 0.2, 1) infinite; }
-        .animate-spin-slow { animation: spin-slow 20s linear infinite; }
-        .animate-spin-slower { animation: spin-slower 25s linear infinite; }
-        .animate-spin-slowest { animation: spin-slowest 30s linear infinite; }
-        .animate-spin-3d { animation: spin-3d 3s linear infinite; }
-        .animate-spin-3d-reverse { animation: spin-3d-reverse 3s linear infinite; }
-        .animate-gradient-x { animation: gradient-x 3s ease infinite; background-size: 200% 200%; }
-        .animate-pulse-slow { animation: pulse-slow 3s ease-in-out infinite; }
-        .animate-pulse-text { animation: pulse-text 2s ease-in-out infinite; }
-        .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
-        .animate-fadeIn { animation: fadeIn 0.5s ease-out; }
-        .animate-scaleIn { animation: scaleIn 0.5s ease-out; }
-        .animate-slideIn { animation: slideIn 0.5s ease-out; }
-        .animate-shake { animation: shake 0.5s ease-in-out; }
-        .animate-shimmer { animation: shimmer 2s infinite; }
-        .animate-border-pulse { animation: border-pulse 2s ease-in-out infinite; }
-        .animate-bounce-3d { animation: bounce-3d 2s ease-in-out infinite; }
-        .animate-particle-burst { animation: particle-burst 1s ease-out forwards; }
-        .animate-bounce-subtle { animation: bounce-subtle 2s ease-in-out infinite; }
-        .animate-pointing-finger { animation: pointing-finger 1.5s ease-in-out infinite; }
-        .animate-draw-circle { animation: draw-circle 3s ease-in-out infinite; }
-        .animate-attention-glow { animation: attention-glow 2s ease-in-out infinite; }
-        .animate-dash { stroke-dasharray: 500; stroke-dashoffset: 500; animation: dash 3s linear infinite; }
-        
-        .animation-delay-500 { animation-delay: 500ms; }
-        .animation-delay-1000 { animation-delay: 1000ms; }
-        .animation-delay-2000 { animation-delay: 2000ms; }
-        .animation-delay-4000 { animation-delay: 4000ms; }
-        
-        .perspective-1000 { perspective: 1000px; }
-        .rotate-y-12 { transform: rotateY(12deg); }
-        
-        .glitch {
-          position: relative;
-        }
-        
-        .glitch::before,
-        .glitch::after {
-          content: attr(data-text);
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background: inherit;
-          clip: rect(0, 0, 0, 0);
-        }
-        
-        .glitch:hover::before {
-          left: 2px;
-          text-shadow: -2px 0 #ff00c1;
-          animation: glitch-1 0.3s infinite linear alternate-reverse;
-        }
-        
-        .glitch:hover::after {
-          left: -2px;
-          text-shadow: 2px 0 #00fff9;
-          animation: glitch-2 0.3s infinite linear alternate-reverse;
-        }
-        
-        @keyframes glitch-1 {
-          0% { clip: rect(20px, 9999px, 20px, 0); }
-          100% { clip: rect(80px, 9999px, 140px, 0); }
-        }
-        
-        @keyframes glitch-2 {
-          0% { clip: rect(40px, 9999px, 70px, 0); }
-          100% { clip: rect(100px, 9999px, 130px, 0); }
-        }
-      `}</style>
+      {/* Celebration Modal */}
+      {showCelebration && (
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-2xl flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="relative max-w-lg w-full">
+            {/* Exploding Background */}
+            <div className="absolute inset-0 bg-gradient-to-r from-gray-600 via-white to-gray-600 rounded-3xl blur-3xl animate-pulse-slow"></div>
+            
+            {/* Confetti Cannons */}
+            {[...Array(20)].map((_, i) => (
+              <div
+                key={i}
+                className="absolute w-2 h-2 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full animate-confetti-cannon"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: '50%',
+                  animationDelay: `${i * 0.1}s`,
+                  animationDuration: `${1 + Math.random()}s`
+                }}
+              />
+            ))}
+            
+            {/* Modal Content */}
+            <div className="relative bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-12 border border-white/30 shadow-2xl transform-gpu animate-scaleIn">
+              <div className="text-center">
+                {/* Exploding Icon */}
+                <div className="relative mb-8">
+                  <div className="text-8xl animate-bounce-3d">🎉</div>
+                  {[...Array(16)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="absolute w-3 h-3 bg-white rounded-full animate-confetti-spiral"
+                      style={{
+                        top: '50%',
+                        left: '50%',
+                        transform: `rotate(${i * 22.5}deg) translateY(-70px)`,
+                        animationDelay: `${i * 0.05}s`
+                      }}
+                    />
+                  ))}
+                </div>
+                
+                <h2 className="text-5xl font-black mb-4 bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-400 bg-clip-text text-transparent animate-pulse">
+                  🚀 SUCCESSFUL! 🚀
+                </h2>
+                
+                <p className="text-2xl text-gray-300 mb-4">You have secured</p>
+                
+                <div className="text-7xl font-black text-white mb-3 animate-float-3d">$5,000 FART</div>
+                
+                <div className="inline-block bg-gradient-to-r from-green-500/30 to-green-600/30 px-8 py-4 rounded-full mb-6 border border-green-500/50">
+                  <span className="text-3xl text-green-400">+{presaleStats.currentBonus}% BONUS</span>
+                </div>
+                
+                <p className="text-sm text-gray-500 mb-8">
+                  Processed on {verifiedChains.length} chains: {verifiedChains.join(', ')}
+                </p>
+                
+                <button
+                  onClick={() => setShowCelebration(false)}
+                  className="w-full bg-gradient-to-r from-gray-700 to-gray-900 hover:from-gray-800 hover:to-gray-900 text-white font-bold py-5 px-8 rounded-xl transition-all transform hover:scale-110 text-2xl relative group overflow-hidden border border-white/30"
+                >
+                  <span className="relative z-10">VIEW</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/30 to-white/0 animate-shimmer"></div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
